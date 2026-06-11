@@ -1,8 +1,4 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+// SellerCrew V2 Enterprise Database Schema
 
 generator client {
   provider = "prisma-client-js"
@@ -13,20 +9,172 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// ============================================
+// AUTH & USERS
+// ============================================
+
 model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  name      String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id            String   @id @default(cuid())
+  email         String   @unique
+  name          String?
+  avatar        String?
+  passwordHash  String?
+  emailVerified Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  memberships     OrganizationMember[]
+  activityLogs    ActivityLog[]
+  ownedOrgs       Organization[]      @relation("OrgOwner")
 }
 
-model Post {
+// ============================================
+// MULTI-TENANT ORGANIZATIONS
+// ============================================
+
+model Organization {
   id        String   @id @default(cuid())
-  title     String
-  content   String?
-  published Boolean  @default(false)
-  authorId  String
+  name      String
+  logo      String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  ownerId    String  @map("owner_id")
+  owner      User    @relation("OrgOwner", fields: [ownerId], references: [id])
+
+  members      OrganizationMember[]
+  projects     Project[]
+  subscription Subscription?
+  credits      Credit?
+}
+
+model OrganizationMember {
+  id             String   @id @default(cuid())
+  organizationId String   @map("organization_id")
+  userId         String   @map("user_id")
+  role           String   @default("member") // owner, admin, manager, member, viewer
+  joinedAt       DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, userId])
+}
+
+// ============================================
+// SUBSCRIPTIONS & BILLING
+// ============================================
+
+model Subscription {
+  id             String   @id @default(cuid())
+  organizationId String   @unique @map("organization_id")
+  plan           String   @default("starter") // starter, pro, agency, enterprise
+  status         String   @default("active")  // active, past_due, cancelled, expired
+  startDate      DateTime @default(now()) @map("start_date")
+  endDate        DateTime? @map("end_date")
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+}
+
+model Credit {
+  id             String   @id @default(cuid())
+  organizationId String   @unique @map("organization_id")
+  balance        Int      @default(0)
+  used           Int      @default(0)
+  updatedAt      DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+}
+
+// ============================================
+// PROJECTS & LISTINGS
+// ============================================
+
+model Project {
+  id             String   @id @default(cuid())
+  organizationId String   @map("organization_id")
+  name           String
+  marketplace    String   @default("amazon") // amazon, ebay, walmart, etc.
+  country        String   @default("US")
+  status         String   @default("active") // active, archived, draft
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  listings     Listing[]
+  agentRuns    AgentRun[]
+}
+
+model Listing {
+  id          String   @id @default(cuid())
+  projectId   String   @map("project_id")
+  title       String?
+  description String?
+  status      String   @default("draft") // draft, generated, reviewed, published
+  score       Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  project     Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  assets      Asset[]
+  generations Generation[]
+}
+
+model Asset {
+  id        String   @id @default(cuid())
+  listingId String   @map("listing_id")
+  fileUrl   String   @map("file_url")
+  type      String   // image, video, document, infographic
+  createdAt DateTime @default(now())
+
+  listing Listing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+}
+
+// ============================================
+// AI AGENTS & GENERATIONS
+// ============================================
+
+model Generation {
+  id        String   @id @default(cuid())
+  listingId String   @map("listing_id")
+  agentId   String   @map("agent_id")
+  input     String?
+  output    String?
+  tokens    Int      @default(0)
+  cost      Int      @default(0) // credits consumed
+  model     String?
+  duration  Int      @default(0) // milliseconds
+  createdAt DateTime @default(now())
+
+  listing Listing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+}
+
+model AgentRun {
+  id          String    @id @default(cuid())
+  projectId   String    @map("project_id")
+  agent       String    // agent id (ali, raed, fares, etc.)
+  status      String    @default("pending") // pending, running, completed, failed
+  input       String?
+  output      String?
+  startedAt   DateTime? @map("started_at")
+  finishedAt  DateTime? @map("finished_at")
+  createdAt   DateTime  @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+}
+
+// ============================================
+// ACTIVITY LOGS
+// ============================================
+
+model ActivityLog {
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id")
+  action    String
+  metadata  String?  // JSON string
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }

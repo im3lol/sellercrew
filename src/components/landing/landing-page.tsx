@@ -5,6 +5,12 @@ import { useAppStore } from "@/lib/store";
 import { agents } from "@/lib/agents";
 import { Button } from "@/components/ui/button";
 import {
+  Accordion,
+  AccordionItem,
+  AccordionTrigger,
+  AccordionContent,
+} from "@/components/ui/accordion";
+import {
   ArrowRight,
   Zap,
   Search,
@@ -15,6 +21,11 @@ import {
   ChevronDown,
   Check,
   Star,
+  Upload,
+  Users,
+  ArrowRightLeft,
+  Download,
+  Play,
 } from "lucide-react";
 import { useState } from "react";
 
@@ -165,7 +176,7 @@ function AgentShowcase() {
           className="text-center mb-10 sm:mb-14"
         >
           <h2 className="text-3xl sm:text-4xl font-bold text-[#0B0F1A] mb-4">
-            Meet Your AI Team
+            Meet The Crew
           </h2>
           <p className="text-base sm:text-lg text-gray-500 max-w-2xl mx-auto">
             11 specialized agents, each an expert in their domain, working together to create
@@ -199,7 +210,7 @@ function AgentShowcase() {
             </div>
           </motion.div>
 
-          {/* Team: 3 per row mobile, 5 per row desktop */}
+          {/* Team: 2 per row mobile, 5 per row desktop */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
@@ -354,18 +365,20 @@ const pricingPlans = [
     name: "Starter",
     price: "$29",
     period: "/month",
-    description: "Perfect for new sellers getting started.",
-    features: ["5 Listings/month", "Keyword Research", "Basic Compliance", "Email Support"],
+    description: "10 Listings, 500 Credits, 1 User",
+    features: ["10 Listings/month", "500 Credits", "1 User Seat", "Keyword Research", "Basic Compliance", "Email Support"],
     cta: "Get Started",
     popular: false,
   },
   {
-    name: "Professional",
+    name: "Pro",
     price: "$79",
     period: "/month",
-    description: "For growing sellers who need more power.",
+    description: "100 Listings, 5,000 Credits, 5 Users",
     features: [
-      "25 Listings/month",
+      "100 Listings/month",
+      "5,000 Credits",
+      "5 User Seats",
       "Advanced Keyword Research",
       "Full Compliance Suite",
       "Competitor Analysis",
@@ -379,9 +392,11 @@ const pricingPlans = [
     name: "Agency",
     price: "$199",
     period: "/month",
-    description: "For agencies managing multiple brands.",
+    description: "500 Listings, 25,000 Credits, 20 Users",
     features: [
-      "Unlimited Listings",
+      "500 Listings/month",
+      "25,000 Credits",
+      "20 User Seats",
       "All Research Tools",
       "Full Compliance Suite",
       "Competitor Intelligence",
@@ -396,9 +411,11 @@ const pricingPlans = [
     name: "Enterprise",
     price: "Custom",
     period: "",
-    description: "For large organizations with custom needs.",
+    description: "Unlimited Everything",
     features: [
-      "Everything in Agency",
+      "Unlimited Listings",
+      "Unlimited Credits",
+      "Unlimited Users",
       "Custom Agent Training",
       "Multi-Marketplace",
       "SLA Guarantee",
@@ -478,6 +495,285 @@ function PricingSection() {
             </motion.div>
           ))}
         </div>
+      </div>
+    </section>
+  );
+}
+
+/* ──────────────────────────────────────────────
+   NEW SECTION: HowItWorks
+   ────────────────────────────────────────────── */
+
+const howItWorksSteps = [
+  {
+    number: 1,
+    icon: Upload,
+    title: "Upload Product",
+    description: "Enter your product details and our AI team gets to work immediately.",
+    color: "#035EF9",
+  },
+  {
+    number: 2,
+    icon: Users,
+    title: "AI Team Analysis",
+    description: "11 specialized agents analyze every aspect of your product and market.",
+    color: "#36B46F",
+  },
+  {
+    number: 3,
+    icon: ArrowRightLeft,
+    title: "Agent Pipeline",
+    description: "Each agent contributes their expertise in sequence, building on previous insights.",
+    color: "#FC7403",
+  },
+  {
+    number: 4,
+    icon: Download,
+    title: "Export Listing",
+    description: "Get a complete, optimized Amazon listing ready to publish.",
+    color: "#7E44E6",
+  },
+];
+
+function HowItWorksSection() {
+  return (
+    <section className="py-24 bg-white">
+      <div className="max-w-6xl mx-auto px-6">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          className="text-center mb-16"
+        >
+          <h2 className="text-3xl md:text-4xl font-bold text-[#0B0F1A] mb-4">
+            How It Works
+          </h2>
+          <p className="text-lg text-gray-500 max-w-2xl mx-auto">
+            From product details to Amazon-ready listing in four simple steps.
+          </p>
+        </motion.div>
+
+        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 lg:gap-4">
+          {howItWorksSteps.map((step, i) => (
+            <motion.div
+              key={step.number}
+              initial={{ opacity: 0, y: 30 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ delay: i * 0.15, duration: 0.5 }}
+              className="relative"
+            >
+              <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 text-center hover:shadow-lg transition-shadow h-full">
+                {/* Step number circle */}
+                <div className="flex items-center justify-center mb-5">
+                  <div
+                    className="w-14 h-14 rounded-full flex items-center justify-center text-white font-bold text-xl shadow-md"
+                    style={{ backgroundColor: step.color }}
+                  >
+                    {step.number}
+                  </div>
+                </div>
+
+                {/* Icon */}
+                <div
+                  className="w-10 h-10 rounded-lg flex items-center justify-center mx-auto mb-4"
+                  style={{ backgroundColor: step.color + "15" }}
+                >
+                  <step.icon className="h-5 w-5" style={{ color: step.color }} />
+                </div>
+
+                {/* Title & Description */}
+                <h3 className="font-semibold text-[#0B0F1A] text-lg mb-2">{step.title}</h3>
+                <p className="text-gray-500 text-sm leading-relaxed">{step.description}</p>
+              </div>
+
+              {/* Connecting arrow between cards (desktop only) */}
+              {i < 3 && (
+                <div className="hidden lg:flex absolute top-1/2 -right-2 transform -translate-y-1/2 z-10">
+                  <ArrowRight className="h-5 w-5 text-gray-300" />
+                </div>
+              )}
+            </motion.div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/* ──────────────────────────────────────────────
+   NEW SECTION: FAQ
+   ────────────────────────────────────────────── */
+
+const faqItems = [
+  {
+    question: "What makes SellerCrew different from other AI listing tools?",
+    answer:
+      "Unlike generic AI tools that give you one-size-fits-all output, SellerCrew uses 11 specialized AI agents, each an expert in their domain. From product research to compliance checking, every aspect of your listing is handled by a dedicated specialist.",
+  },
+  {
+    question: "How does the credit system work?",
+    answer:
+      "Each AI agent has a specific credit cost. A full listing generation uses 95 credits total. Your plan determines how many credits you receive monthly. Unused credits do not roll over.",
+  },
+  {
+    question: "Can I use SellerCrew for multiple marketplaces?",
+    answer:
+      "Yes! SellerCrew supports Amazon US, UK, DE, and more. Each project can target a specific marketplace and country, with agents adapting their output accordingly.",
+  },
+  {
+    question: "How accurate is the compliance checking?",
+    answer:
+      "Our compliance agent Saleem validates listings against the latest Amazon policies with 98%+ accuracy. Regular updates ensure alignment with policy changes.",
+  },
+  {
+    question: "Can I customize the AI agents?",
+    answer:
+      "Enterprise plan users can request custom agent training and specialized workflows tailored to their brand voice and product categories.",
+  },
+  {
+    question: "Is my data secure?",
+    answer:
+      "Absolutely. We use enterprise-grade encryption, and your data is never used to train our models. Each organization's data is completely isolated.",
+  },
+];
+
+function FAQSection() {
+  return (
+    <section className="py-24 bg-white">
+      <div className="max-w-3xl mx-auto px-6">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          className="text-center mb-14"
+        >
+          <h2 className="text-3xl md:text-4xl font-bold text-[#0B0F1A] mb-4">
+            Frequently Asked Questions
+          </h2>
+          <p className="text-lg text-gray-500">
+            Everything you need to know about SellerCrew.
+          </p>
+        </motion.div>
+
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ delay: 0.1 }}
+        >
+          <Accordion type="single" collapsible className="w-full">
+            {faqItems.map((item, i) => (
+              <AccordionItem
+                key={i}
+                value={`faq-${i}`}
+                className="border-gray-200"
+              >
+                <AccordionTrigger className="text-left text-base font-medium text-[#0B0F1A] hover:no-underline hover:text-[#0B0F1A]/80 py-5">
+                  {item.question}
+                </AccordionTrigger>
+                <AccordionContent className="text-gray-500 leading-relaxed text-sm">
+                  {item.answer}
+                </AccordionContent>
+              </AccordionItem>
+            ))}
+          </Accordion>
+        </motion.div>
+      </div>
+    </section>
+  );
+}
+
+/* ──────────────────────────────────────────────
+   NEW SECTION: CTA
+   ────────────────────────────────────────────── */
+
+function CTASection() {
+  const setView = useAppStore((s) => s.setView);
+
+  return (
+    <section className="relative py-24 overflow-hidden bg-[#0B0F1A]">
+      {/* Background gradient accents */}
+      <div className="absolute inset-0">
+        <div className="absolute top-0 left-1/3 w-80 h-80 bg-blue-500/10 rounded-full blur-3xl" />
+        <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-purple-500/10 rounded-full blur-3xl" />
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-orange-500/5 rounded-full blur-3xl" />
+      </div>
+
+      {/* Floating agent avatars (decorative) */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        {agents.slice(0, 6).map((agent, i) => {
+          const positions = [
+            { top: "10%", left: "8%" },
+            { top: "20%", right: "12%" },
+            { bottom: "15%", left: "15%" },
+            { bottom: "25%", right: "8%" },
+            { top: "40%", left: "5%" },
+            { top: "35%", right: "5%" },
+          ];
+          const pos = positions[i];
+          const style: React.CSSProperties = {
+            position: "absolute",
+            opacity: 0.15,
+            ...pos,
+          };
+          return (
+            <motion.div
+              key={agent.id}
+              style={style}
+              animate={{ y: [0, -10, 0] }}
+              transition={{ repeat: Infinity, duration: 3 + i * 0.5, ease: "easeInOut" }}
+            >
+              <div
+                className="w-14 h-14 rounded-xl overflow-hidden"
+                style={{ backgroundColor: agent.color }}
+              >
+                <img
+                  src={agent.avatar}
+                  alt={agent.name}
+                  className="w-full h-full object-cover"
+                />
+              </div>
+            </motion.div>
+          );
+        })}
+      </div>
+
+      <div className="relative z-10 max-w-3xl mx-auto px-6 text-center">
+        <motion.div
+          initial={{ opacity: 0, y: 30 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.6 }}
+        >
+          <h2 className="text-3xl md:text-5xl font-bold text-white mb-6 leading-tight">
+            Ready to Transform Your
+            <br />
+            Amazon Listings?
+          </h2>
+          <p className="text-lg text-white/60 max-w-xl mx-auto mb-10 leading-relaxed">
+            Join thousands of sellers who use SellerCrew&apos;s AI team to create better listings, faster.
+          </p>
+
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+            <Button
+              size="lg"
+              className="bg-white text-[#0B0F1A] hover:bg-white/90 px-8 h-12 text-base font-semibold rounded-lg"
+              onClick={() => setView("dashboard")}
+            >
+              Start Free Trial
+              <ArrowRight className="ml-2 h-4 w-4" />
+            </Button>
+            <Button
+              size="lg"
+              variant="outline"
+              className="border-white/20 text-white hover:bg-white/5 px-8 h-12 text-base rounded-lg"
+            >
+              <Play className="mr-2 h-4 w-4" />
+              Watch Demo
+            </Button>
+          </div>
+        </motion.div>
       </div>
     </section>
   );
@@ -587,6 +883,7 @@ export function LandingPage() {
     <div className="min-h-screen">
       <Navbar />
       <HeroSection />
+      <HowItWorksSection />
       <div id="agents">
         <AgentShowcase />
       </div>
@@ -597,6 +894,8 @@ export function LandingPage() {
       <div id="pricing">
         <PricingSection />
       </div>
+      <FAQSection />
+      <CTASection />
       <Footer />
     </div>
   );

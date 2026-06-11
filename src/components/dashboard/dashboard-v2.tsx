@@ -1,0 +1,1061 @@
+'use client';
+
+import { useAppStore, type DashboardPage } from '@/lib/store';
+import { agents } from '@/lib/agents';
+import { Button } from '@/components/ui/button';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Separator } from '@/components/ui/separator';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Badge } from '@/components/ui/badge';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from '@/components/ui/breadcrumb';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
+import { Input } from '@/components/ui/input';
+import {
+  Home,
+  FolderKanban,
+  FileText,
+  Image,
+  Sparkles,
+  Search,
+  Target,
+  Eye,
+  Shield,
+  BarChart3,
+  Bot,
+  TrendingUp,
+  Clock,
+  CreditCard,
+  Activity,
+  Users,
+  Building2,
+  ChevronLeft,
+  ChevronRight,
+  ChevronDown,
+  LogOut,
+  Bell,
+  Settings,
+  User,
+  Plus,
+  Zap,
+  CheckCircle2,
+  AlertCircle,
+  ArrowRight,
+  Receipt,
+  PieChart,
+  Database,
+  ShieldCheck,
+  FileSearch,
+  LayoutDashboard,
+  Layers,
+  FolderOpen,
+  DollarSign,
+  BarChart2,
+  UserCog,
+  Globe,
+  CalendarDays,
+  Loader2,
+} from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+
+// ─── Existing Module Imports ────────────────────────────────────────────────
+import { DashboardHome } from './modules/dashboard-home';
+import { ListingBuilder } from './modules/listing-builder';
+import { ListingAnalyzer } from './modules/listing-analyzer';
+import { CompetitorAnalyzer } from './modules/competitor-analyzer';
+import { KeywordCenter } from './modules/keyword-center';
+import { ImageBriefGenerator } from './modules/image-brief-generator';
+import { AgentsView } from './modules/agents-view';
+import { ProjectsView } from './modules/projects-view';
+
+// ─── Navigation Configuration ───────────────────────────────────────────────
+
+interface NavItem {
+  page: DashboardPage;
+  label: string;
+  icon: React.ElementType;
+}
+
+interface NavGroup {
+  label: string;
+  items: NavItem[];
+  adminOnly?: boolean;
+}
+
+const navGroups: NavGroup[] = [
+  {
+    label: 'Workspace',
+    items: [
+      { page: 'home', label: 'Home', icon: Home },
+      { page: 'projects', label: 'Projects', icon: FolderKanban },
+      { page: 'listings', label: 'Listings', icon: FileText },
+      { page: 'assets', label: 'Assets', icon: Image },
+    ],
+  },
+  {
+    label: 'AI Tools',
+    items: [
+      { page: 'listing-builder', label: 'Generate Listing', icon: Sparkles },
+      { page: 'research-report', label: 'Research Report', icon: Search },
+      { page: 'keyword-center', label: 'Keyword Research', icon: Target },
+      { page: 'image-brief', label: 'Image Analysis', icon: Eye },
+      { page: 'compliance-check', label: 'Compliance Check', icon: Shield },
+      { page: 'listing-score', label: 'Listing Score', icon: BarChart3 },
+    ],
+  },
+  {
+    label: 'Team',
+    items: [
+      { page: 'agents', label: 'AI Agents', icon: Bot },
+      { page: 'agent-performance', label: 'Performance', icon: TrendingUp },
+      { page: 'agent-history', label: 'History', icon: Clock },
+    ],
+  },
+  {
+    label: 'Billing',
+    items: [
+      { page: 'plans', label: 'Plans & Credits', icon: CreditCard },
+      { page: 'usage', label: 'Usage', icon: Activity },
+    ],
+  },
+  {
+    label: 'Admin',
+    adminOnly: true,
+    items: [
+      { page: 'admin-users', label: 'Users', icon: Users },
+      { page: 'admin-orgs', label: 'Organizations', icon: Building2 },
+    ],
+  },
+];
+
+// ─── Page Title Map ─────────────────────────────────────────────────────────
+
+const pageTitleMap: Record<DashboardPage, string> = {
+  home: 'Home',
+  projects: 'Projects',
+  listings: 'Listings',
+  assets: 'Assets',
+  'listing-builder': 'Generate Listing',
+  'listing-analyzer': 'Listing Analyzer',
+  'competitor-analyzer': 'Competitor Analyzer',
+  'keyword-center': 'Keyword Research',
+  'image-brief': 'Image Analysis',
+  'research-report': 'Research Report',
+  'compliance-check': 'Compliance Check',
+  'listing-score': 'Listing Score',
+  agents: 'AI Agents',
+  'agent-performance': 'Agent Performance',
+  'agent-history': 'Agent History',
+  billing: 'Billing',
+  plans: 'Plans & Credits',
+  invoices: 'Invoices',
+  credits: 'Credits',
+  usage: 'Usage',
+  'admin-users': 'Users',
+  'admin-orgs': 'Organizations',
+  'admin-subscriptions': 'Subscriptions',
+  'admin-analytics': 'Analytics',
+};
+
+// ─── Placeholder Page Component ─────────────────────────────────────────────
+
+function PlaceholderPage({
+  title,
+  description,
+  icon: Icon,
+  accentColor = '#035EF9',
+  mockItems,
+}: {
+  title: string;
+  description: string;
+  icon: React.ElementType;
+  accentColor?: string;
+  mockItems?: { label: string; value: string; status?: 'active' | 'pending' | 'completed' }[];
+}) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.3 }}
+      className="space-y-6 max-w-7xl"
+    >
+      {/* Header */}
+      <div className="flex items-start gap-4">
+        <div
+          className="w-12 h-12 rounded-xl flex items-center justify-center shrink-0"
+          style={{ backgroundColor: accentColor + '15' }}
+        >
+          <Icon className="h-6 w-6" style={{ color: accentColor }} />
+        </div>
+        <div>
+          <h1 className="text-2xl font-bold text-[#0B0F1A]">{title}</h1>
+          <p className="text-gray-500 mt-1">{description}</p>
+        </div>
+      </div>
+
+      {/* Coming Soon Banner */}
+      <Card className="border-dashed border-2" style={{ borderColor: accentColor + '30' }}>
+        <CardContent className="p-8 text-center">
+          <div
+            className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4"
+            style={{ backgroundColor: accentColor + '10' }}
+          >
+            <Icon className="h-8 w-8" style={{ color: accentColor }} />
+          </div>
+          <h3 className="text-lg font-semibold text-[#0B0F1A] mb-2">Coming Soon</h3>
+          <p className="text-gray-500 max-w-md mx-auto text-sm">
+            We&apos;re building something amazing. This feature will be available in an upcoming release.
+          </p>
+          <Badge variant="secondary" className="mt-4">
+            In Development
+          </Badge>
+        </CardContent>
+      </Card>
+
+      {/* Mock Data Preview */}
+      {mockItems && mockItems.length > 0 && (
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base">Preview</CardTitle>
+            <CardDescription>Sample data for this section</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {mockItems.map((item, i) => (
+                <div
+                  key={i}
+                  className="flex items-center justify-between py-2 px-3 rounded-lg bg-gray-50/80"
+                >
+                  <div className="flex items-center gap-3">
+                    <div
+                      className="w-2 h-2 rounded-full"
+                      style={{
+                        backgroundColor:
+                          item.status === 'active'
+                            ? '#36B46F'
+                            : item.status === 'pending'
+                            ? '#FC7403'
+                            : item.status === 'completed'
+                            ? '#035EF9'
+                            : '#9CA3AF',
+                      }}
+                    />
+                    <span className="text-sm text-[#0B0F1A]">{item.label}</span>
+                  </div>
+                  <span className="text-sm text-gray-500">{item.value}</span>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+    </motion.div>
+  );
+}
+
+// ─── Individual Placeholder Pages ───────────────────────────────────────────
+
+function ListingsPage() {
+  return (
+    <PlaceholderPage
+      title="Listings"
+      description="Manage and organize all your product listings in one place."
+      icon={FileText}
+      mockItems={[
+        { label: 'Wireless Earbuds Pro', value: 'Active', status: 'active' },
+        { label: 'Smart Watch Series 5', value: 'Draft', status: 'pending' },
+        { label: 'Coffee Maker X200', value: 'Active', status: 'active' },
+        { label: 'Yoga Mat Premium', value: 'Completed', status: 'completed' },
+        { label: 'USB-C Hub Adapter', value: 'Draft', status: 'pending' },
+        { label: 'LED Desk Lamp', value: 'Active', status: 'active' },
+      ]}
+    />
+  );
+}
+
+function AssetsPage() {
+  return (
+    <PlaceholderPage
+      title="Assets"
+      description="Your media library — images, infographics, and creative assets."
+      icon={Image}
+      accentColor="#7E44E6"
+      mockItems={[
+        { label: 'Product Photography', value: '24 files' },
+        { label: 'Infographics', value: '12 files' },
+        { label: 'Lifestyle Images', value: '18 files' },
+        { label: 'Brand Assets', value: '6 files' },
+        { label: 'A+ Content Graphics', value: '9 files' },
+      ]}
+    />
+  );
+}
+
+function ResearchReportPage() {
+  return (
+    <PlaceholderPage
+      title="Research Report"
+      description="AI-powered market research and product analysis reports."
+      icon={Search}
+      accentColor="#36B46F"
+      mockItems={[
+        { label: 'Wireless Earbuds Market Analysis', value: '2 days ago', status: 'completed' },
+        { label: 'Smart Watch Competitive Landscape', value: '5 days ago', status: 'completed' },
+        { label: 'Coffee Maker Trends Q4', value: 'In progress', status: 'pending' },
+        { label: 'Yoga Mat Niche Report', value: '1 week ago', status: 'completed' },
+      ]}
+    />
+  );
+}
+
+function ComplianceCheckPage() {
+  return (
+    <PlaceholderPage
+      title="Compliance Check"
+      description="Validate your listings against Amazon policies and detect risks."
+      icon={Shield}
+      accentColor="#E82E33"
+      mockItems={[
+        { label: 'Wireless Earbuds Pro', value: 'Passed', status: 'completed' },
+        { label: 'Smart Watch Series 5', value: '2 Warnings', status: 'pending' },
+        { label: 'Coffee Maker X200', value: 'Passed', status: 'completed' },
+        { label: 'Yoga Mat Premium', value: '1 Issue', status: 'pending' },
+      ]}
+    />
+  );
+}
+
+function ListingScorePage() {
+  return (
+    <PlaceholderPage
+      title="Listing Score"
+      description="Score and benchmark your listings against best practices."
+      icon={BarChart3}
+      accentColor="#FC7403"
+      mockItems={[
+        { label: 'Wireless Earbuds Pro', value: '92/100', status: 'completed' },
+        { label: 'Smart Watch Series 5', value: '78/100', status: 'pending' },
+        { label: 'Coffee Maker X200', value: '85/100', status: 'completed' },
+        { label: 'Yoga Mat Premium', value: '88/100', status: 'completed' },
+      ]}
+    />
+  );
+}
+
+function AgentPerformancePage() {
+  return (
+    <PlaceholderPage
+      title="Agent Performance"
+      description="Track AI agent efficiency, accuracy, and output quality."
+      icon={TrendingUp}
+      accentColor="#3EC9D1"
+      mockItems={[
+        { label: 'Bayan — Copywriter', value: '98% accuracy', status: 'active' },
+        { label: 'Nadeem — SEO', value: '95% accuracy', status: 'active' },
+        { label: 'Saleem — Compliance', value: '99% accuracy', status: 'active' },
+        { label: 'Hakim — Strategy', value: '94% accuracy', status: 'active' },
+        { label: 'Fares — Market Intel', value: '96% accuracy', status: 'active' },
+      ]}
+    />
+  );
+}
+
+function AgentHistoryPage() {
+  return (
+    <PlaceholderPage
+      title="Agent History"
+      description="Review past agent runs, outputs, and conversation logs."
+      icon={Clock}
+      accentColor="#60697A"
+      mockItems={[
+        { label: 'Listing generation — Earbuds', value: '2 min ago', status: 'completed' },
+        { label: 'Keyword research — Coffee Maker', value: '15 min ago', status: 'completed' },
+        { label: 'Compliance check — Yoga Mat', value: '1 hour ago', status: 'completed' },
+        { label: 'Competitor analysis — Watch', value: '2 hours ago', status: 'completed' },
+        { label: 'Image brief — USB Hub', value: '3 hours ago', status: 'completed' },
+      ]}
+    />
+  );
+}
+
+function BillingPage() {
+  return (
+    <PlaceholderPage
+      title="Billing"
+      description="Manage your subscription, credits, and payment methods."
+      icon={CreditCard}
+      accentColor="#035EF9"
+      mockItems={[
+        { label: 'Professional Plan', value: '$49/mo', status: 'active' },
+        { label: 'Credits Balance', value: '4,505', status: 'active' },
+        { label: 'Next Billing Date', value: 'Mar 15, 2026', status: 'pending' },
+        { label: 'Payment Method', value: 'Visa •••• 4242', status: 'active' },
+      ]}
+    />
+  );
+}
+
+function PlansPage() {
+  return (
+    <PlaceholderPage
+      title="Plans & Credits"
+      description="View available plans, upgrade, and manage your credit balance."
+      icon={CreditCard}
+      accentColor="#035EF9"
+      mockItems={[
+        { label: 'Starter', value: '1,000 credits/mo' },
+        { label: 'Professional', value: '5,000 credits/mo', status: 'active' },
+        { label: 'Enterprise', value: 'Unlimited' },
+        { label: 'Current Credits', value: '4,505 remaining', status: 'active' },
+      ]}
+    />
+  );
+}
+
+function InvoicesPage() {
+  return (
+    <PlaceholderPage
+      title="Invoices"
+      description="View and download your billing invoices and receipts."
+      icon={Receipt}
+      accentColor="#640324"
+      mockItems={[
+        { label: 'Invoice #INV-2026-003', value: '$49.00', status: 'completed' },
+        { label: 'Invoice #INV-2026-002', value: '$49.00', status: 'completed' },
+        { label: 'Invoice #INV-2026-001', value: '$49.00', status: 'completed' },
+        { label: 'Invoice #INV-2025-012', value: '$49.00', status: 'completed' },
+      ]}
+    />
+  );
+}
+
+function CreditsPage() {
+  return (
+    <PlaceholderPage
+      title="Credits"
+      description="Monitor credit usage, purchase additional credits, and view transaction history."
+      icon={Zap}
+      accentColor="#FEBD05"
+      mockItems={[
+        { label: 'Current Balance', value: '4,505 credits', status: 'active' },
+        { label: 'Used This Month', value: '495 credits' },
+        { label: 'Purchased Add-on', value: '+1,000 credits', status: 'completed' },
+        { label: 'Referral Bonus', value: '+500 credits', status: 'completed' },
+      ]}
+    />
+  );
+}
+
+function UsagePage() {
+  return (
+    <PlaceholderPage
+      title="Usage"
+      description="Detailed breakdown of feature usage and credit consumption."
+      icon={Activity}
+      accentColor="#36B46F"
+      mockItems={[
+        { label: 'Listing Generation', value: '180 credits', status: 'active' },
+        { label: 'Keyword Research', value: '120 credits', status: 'active' },
+        { label: 'Competitor Analysis', value: '95 credits', status: 'active' },
+        { label: 'Compliance Checks', value: '60 credits', status: 'active' },
+        { label: 'Image Analysis', value: '40 credits', status: 'active' },
+      ]}
+    />
+  );
+}
+
+function AdminUsersPage() {
+  return (
+    <PlaceholderPage
+      title="Users"
+      description="Manage team members, roles, and permissions across your organization."
+      icon={Users}
+      accentColor="#035EF9"
+      mockItems={[
+        { label: 'Ahmed Al-Rashid', value: 'Owner', status: 'active' },
+        { label: 'Sara Chen', value: 'Admin', status: 'active' },
+        { label: 'Omar Hassan', value: 'Manager', status: 'active' },
+        { label: 'Lisa Park', value: 'Member', status: 'pending' },
+        { label: 'David Kim', value: 'Viewer', status: 'active' },
+      ]}
+    />
+  );
+}
+
+function AdminOrgsPage() {
+  return (
+    <PlaceholderPage
+      title="Organizations"
+      description="Manage organizations, settings, and workspace configurations."
+      icon={Building2}
+      accentColor="#7E44E6"
+      mockItems={[
+        { label: 'SellerCrew Inc.', value: '12 members', status: 'active' },
+        { label: 'Gulf Trading Co.', value: '8 members', status: 'active' },
+        { label: 'Tech Ventures LLC', value: '3 members', status: 'pending' },
+      ]}
+    />
+  );
+}
+
+function AdminSubscriptionsPage() {
+  return (
+    <PlaceholderPage
+      title="Subscriptions"
+      description="View and manage all organization subscription plans."
+      icon={Layers}
+      accentColor="#FC7403"
+      mockItems={[
+        { label: 'SellerCrew Inc.', value: 'Enterprise', status: 'active' },
+        { label: 'Gulf Trading Co.', value: 'Professional', status: 'active' },
+        { label: 'Tech Ventures LLC', value: 'Starter', status: 'pending' },
+      ]}
+    />
+  );
+}
+
+function AdminAnalyticsPage() {
+  return (
+    <PlaceholderPage
+      title="Analytics"
+      description="Platform-wide analytics, usage metrics, and performance insights."
+      icon={BarChart2}
+      accentColor="#3EC9D1"
+      mockItems={[
+        { label: 'Total Users', value: '1,247' },
+        { label: 'Active Organizations', value: '89', status: 'active' },
+        { label: 'Credits Consumed (MTD)', value: '142,500' },
+        { label: 'Avg. Session Duration', value: '24 min' },
+        { label: 'Agent Runs (MTD)', value: '8,432', status: 'active' },
+      ]}
+    />
+  );
+}
+
+// ─── Page Renderer ──────────────────────────────────────────────────────────
+
+function renderPage(page: DashboardPage) {
+  switch (page) {
+    case 'home':
+      return <DashboardHome />;
+    case 'projects':
+      return <ProjectsView />;
+    case 'listings':
+      return <ListingsPage />;
+    case 'assets':
+      return <AssetsPage />;
+    case 'listing-builder':
+      return <ListingBuilder />;
+    case 'listing-analyzer':
+      return <ListingAnalyzer />;
+    case 'competitor-analyzer':
+      return <CompetitorAnalyzer />;
+    case 'keyword-center':
+      return <KeywordCenter />;
+    case 'image-brief':
+      return <ImageBriefGenerator />;
+    case 'research-report':
+      return <ResearchReportPage />;
+    case 'compliance-check':
+      return <ComplianceCheckPage />;
+    case 'listing-score':
+      return <ListingScorePage />;
+    case 'agents':
+      return <AgentsView />;
+    case 'agent-performance':
+      return <AgentPerformancePage />;
+    case 'agent-history':
+      return <AgentHistoryPage />;
+    case 'billing':
+      return <BillingPage />;
+    case 'plans':
+      return <PlansPage />;
+    case 'invoices':
+      return <InvoicesPage />;
+    case 'credits':
+      return <CreditsPage />;
+    case 'usage':
+      return <UsagePage />;
+    case 'admin-users':
+      return <AdminUsersPage />;
+    case 'admin-orgs':
+      return <AdminOrgsPage />;
+    case 'admin-subscriptions':
+      return <AdminSubscriptionsPage />;
+    case 'admin-analytics':
+      return <AdminAnalyticsPage />;
+    default:
+      return <DashboardHome />;
+  }
+}
+
+// ─── Breadcrumb Helper ──────────────────────────────────────────────────────
+
+function getBreadcrumb(page: DashboardPage): { group: string; page: string } {
+  for (const group of navGroups) {
+    const found = group.items.find((item) => item.page === page);
+    if (found) {
+      return { group: group.label, page: found.label };
+    }
+  }
+  return { group: 'Dashboard', page: pageTitleMap[page] || 'Home' };
+}
+
+// ─── Main Dashboard Component ───────────────────────────────────────────────
+
+export function DashboardV2() {
+  const {
+    dashboardPage,
+    setDashboardPage,
+    sidebarOpen,
+    setSidebarOpen,
+    user,
+    logout,
+    workspaces,
+    activeWorkspace,
+    setActiveWorkspace,
+    setView,
+  } = useAppStore();
+
+  const isAdmin =
+    activeWorkspace?.role === 'owner' || activeWorkspace?.role === 'admin';
+
+  const sidebarWidth = sidebarOpen ? 260 : 64;
+
+  return (
+    <TooltipProvider delayDuration={0}>
+      <div className="h-screen flex bg-[#F8F9FB]">
+        {/* ── Sidebar ──────────────────────────────────────────────────── */}
+        <motion.aside
+          initial={false}
+          animate={{ width: sidebarWidth }}
+          transition={{ duration: 0.25, ease: [0.4, 0, 0.2, 1] }}
+          className="bg-white border-r border-gray-200/80 flex flex-col shrink-0 h-full overflow-hidden relative z-20"
+          style={{ width: sidebarWidth }}
+        >
+          {/* Logo */}
+          <div className="h-14 flex items-center px-3 border-b border-gray-100 shrink-0">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="w-9 h-9 rounded-lg overflow-hidden shrink-0 flex items-center justify-center bg-[#0B0F1A]">
+                <img src="/logo2.png" alt="SC" className="w-6 h-6 object-contain" />
+              </div>
+              <AnimatePresence>
+                {sidebarOpen && (
+                  <motion.img
+                    src="/logo-text.png"
+                    alt="SellerCrew"
+                    className="h-5 object-contain"
+                    initial={{ opacity: 0, width: 0 }}
+                    animate={{ opacity: 1, width: 'auto' }}
+                    exit={{ opacity: 0, width: 0 }}
+                    transition={{ duration: 0.2 }}
+                  />
+                )}
+              </AnimatePresence>
+            </div>
+          </div>
+
+          {/* Workspace Switcher */}
+          <div className="px-2 py-2 shrink-0">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button className="w-full flex items-center gap-2 px-2 py-2 rounded-lg hover:bg-gray-50 transition-colors text-left">
+                  <div className="w-8 h-8 rounded-lg bg-[#0B0F1A] flex items-center justify-center shrink-0">
+                    {activeWorkspace?.logo ? (
+                      <img
+                        src={activeWorkspace.logo}
+                        alt={activeWorkspace.name}
+                        className="w-5 h-5 object-contain"
+                      />
+                    ) : (
+                      <span className="text-white text-xs font-bold">
+                        {activeWorkspace?.name?.charAt(0) || 'S'}
+                      </span>
+                    )}
+                  </div>
+                  <AnimatePresence>
+                    {sidebarOpen && (
+                      <motion.div
+                        className="flex-1 min-w-0"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        transition={{ duration: 0.15 }}
+                      >
+                        <p className="text-sm font-medium text-[#0B0F1A] truncate">
+                          {activeWorkspace?.name || 'Select Workspace'}
+                        </p>
+                        <p className="text-[10px] text-gray-400 truncate">
+                          {activeWorkspace?.role || 'No workspace'}
+                        </p>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                  {sidebarOpen && (
+                    <ChevronDown className="h-3.5 w-3.5 text-gray-400 shrink-0" />
+                  )}
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="w-56">
+                <DropdownMenuLabel>Workspaces</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                {workspaces.map((ws) => (
+                  <DropdownMenuItem
+                    key={ws.id}
+                    onClick={() => setActiveWorkspace(ws)}
+                    className="flex items-center gap-2 cursor-pointer"
+                  >
+                    <div className="w-6 h-6 rounded-md bg-[#0B0F1A] flex items-center justify-center shrink-0">
+                      {ws.logo ? (
+                        <img src={ws.logo} alt={ws.name} className="w-4 h-4 object-contain" />
+                      ) : (
+                        <span className="text-white text-[10px] font-bold">
+                          {ws.name.charAt(0)}
+                        </span>
+                      )}
+                    </div>
+                    <span className="flex-1 truncate">{ws.name}</span>
+                    {activeWorkspace?.id === ws.id && (
+                      <CheckCircle2 className="h-3.5 w-3.5 text-[#035EF9]" />
+                    )}
+                  </DropdownMenuItem>
+                ))}
+                <DropdownMenuSeparator />
+                <DropdownMenuItem className="text-[#035EF9] cursor-pointer">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Create Workspace
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+
+          <Separator className="shrink-0" />
+
+          {/* Navigation */}
+          <ScrollArea className="flex-1 py-2">
+            <nav className="px-2 space-y-1">
+              {navGroups.map((group) => {
+                // Hide admin-only groups for non-admin users
+                if (group.adminOnly && !isAdmin) return null;
+
+                return (
+                  <div key={group.label} className="mb-3">
+                    {/* Group Label */}
+                    <AnimatePresence>
+                      {sidebarOpen && (
+                        <motion.p
+                          className="text-[10px] font-semibold uppercase tracking-wider text-gray-400 px-3 mb-1.5"
+                          initial={{ opacity: 0, height: 0 }}
+                          animate={{ opacity: 1, height: 'auto' }}
+                          exit={{ opacity: 0, height: 0 }}
+                          transition={{ duration: 0.15 }}
+                        >
+                          {group.label}
+                        </motion.p>
+                      )}
+                    </AnimatePresence>
+
+                    {/* Nav Items */}
+                    {group.items.map((item) => {
+                      const isActive = dashboardPage === item.page;
+                      const navBtn = (
+                        <button
+                          key={item.page}
+                          onClick={() => setDashboardPage(item.page)}
+                          className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-all duration-150 ${
+                            isActive
+                              ? 'bg-[#035EF9]/10 text-[#035EF9] font-medium'
+                              : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                          } ${!sidebarOpen ? 'justify-center px-0' : ''}`}
+                        >
+                          <item.icon
+                            className={`h-[18px] w-[18px] shrink-0 ${
+                              isActive ? 'text-[#035EF9]' : ''
+                            }`}
+                          />
+                          <AnimatePresence>
+                            {sidebarOpen && (
+                              <motion.span
+                                className="truncate"
+                                initial={{ opacity: 0, width: 0 }}
+                                animate={{ opacity: 1, width: 'auto' }}
+                                exit={{ opacity: 0, width: 0 }}
+                                transition={{ duration: 0.15 }}
+                              >
+                                {item.label}
+                              </motion.span>
+                            )}
+                          </AnimatePresence>
+                          {isActive && sidebarOpen && (
+                            <motion.div
+                              layoutId="activeIndicator"
+                              className="ml-auto w-1.5 h-1.5 rounded-full bg-[#035EF9]"
+                              transition={{ type: 'spring', stiffness: 350, damping: 30 }}
+                            />
+                          )}
+                        </button>
+                      );
+
+                      // Show tooltip when sidebar is collapsed
+                      if (!sidebarOpen) {
+                        return (
+                          <Tooltip key={item.page}>
+                            <TooltipTrigger asChild>{navBtn}</TooltipTrigger>
+                            <TooltipContent side="right" sideOffset={8}>
+                              {item.label}
+                            </TooltipContent>
+                          </Tooltip>
+                        );
+                      }
+
+                      return navBtn;
+                    })}
+                  </div>
+                );
+              })}
+            </nav>
+          </ScrollArea>
+
+          {/* Bottom Section */}
+          <div className="border-t border-gray-100 p-2 shrink-0 space-y-0.5">
+            {sidebarOpen && (
+              <>
+                <button
+                  onClick={() => setDashboardPage('billing')}
+                  className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-gray-500 hover:bg-gray-50 hover:text-gray-700 transition-colors"
+                >
+                  <CreditCard className="h-4 w-4 shrink-0" />
+                  <span className="truncate">4,505 credits</span>
+                  <Badge
+                    variant="secondary"
+                    className="ml-auto text-[10px] px-1.5 py-0 bg-[#035EF9]/10 text-[#035EF9] border-0"
+                  >
+                    Pro
+                  </Badge>
+                </button>
+              </>
+            )}
+
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={() => {
+                    logout();
+                    setView('landing');
+                  }}
+                  className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-gray-400 hover:bg-red-50 hover:text-red-600 transition-colors ${
+                    !sidebarOpen ? 'justify-center px-0' : ''
+                  }`}
+                >
+                  <LogOut className="h-4 w-4 shrink-0" />
+                  {sidebarOpen && <span className="truncate">Log Out</span>}
+                </button>
+              </TooltipTrigger>
+              {!sidebarOpen && (
+                <TooltipContent side="right" sideOffset={8}>
+                  Log Out
+                </TooltipContent>
+              )}
+            </Tooltip>
+
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={() => setSidebarOpen(!sidebarOpen)}
+                  className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-gray-400 hover:bg-gray-50 hover:text-gray-600 transition-colors ${
+                    !sidebarOpen ? 'justify-center px-0' : ''
+                  }`}
+                >
+                  {sidebarOpen ? (
+                    <>
+                      <ChevronLeft className="h-4 w-4 shrink-0" />
+                      <span className="truncate">Collapse</span>
+                    </>
+                  ) : (
+                    <ChevronRight className="h-4 w-4 shrink-0" />
+                  )}
+                </button>
+              </TooltipTrigger>
+              {!sidebarOpen && (
+                <TooltipContent side="right" sideOffset={8}>
+                  Expand Sidebar
+                </TooltipContent>
+              )}
+            </Tooltip>
+          </div>
+        </motion.aside>
+
+        {/* ── Main Area ────────────────────────────────────────────────── */}
+        <div className="flex-1 flex flex-col min-w-0">
+          {/* ── Top Bar ──────────────────────────────────────────────── */}
+          <header className="h-14 bg-white border-b border-gray-200/80 flex items-center justify-between px-4 md:px-6 shrink-0">
+            {/* Breadcrumb */}
+            <Breadcrumb className="hidden sm:flex">
+              <BreadcrumbList>
+                <BreadcrumbItem>
+                  <BreadcrumbLink
+                    className="cursor-pointer text-gray-400 hover:text-gray-600"
+                    onClick={() => setDashboardPage('home')}
+                  >
+                    Dashboard
+                  </BreadcrumbLink>
+                </BreadcrumbItem>
+                <BreadcrumbSeparator />
+                <BreadcrumbItem>
+                  <BreadcrumbLink
+                    className="cursor-pointer text-gray-400 hover:text-gray-600"
+                    onClick={() => setDashboardPage('home')}
+                  >
+                    {getBreadcrumb(dashboardPage).group}
+                  </BreadcrumbLink>
+                </BreadcrumbItem>
+                <BreadcrumbSeparator />
+                <BreadcrumbItem>
+                  <BreadcrumbPage className="text-[#0B0F1A] font-medium">
+                    {getBreadcrumb(dashboardPage).page}
+                  </BreadcrumbPage>
+                </BreadcrumbItem>
+              </BreadcrumbList>
+            </Breadcrumb>
+
+            {/* Mobile page title */}
+            <h1 className="sm:hidden text-sm font-semibold text-[#0B0F1A] truncate">
+              {pageTitleMap[dashboardPage]}
+            </h1>
+
+            {/* Search + Actions */}
+            <div className="flex items-center gap-2 md:gap-3">
+              {/* Search (decorative) */}
+              <div className="hidden md:flex items-center relative">
+                <Search className="absolute left-2.5 h-3.5 w-3.5 text-gray-400" />
+                <Input
+                  placeholder="Search..."
+                  className="pl-8 h-8 w-48 lg:w-56 text-sm bg-gray-50/80 border-gray-200/60 focus:bg-white"
+                  readOnly
+                />
+              </div>
+
+              {/* Credits */}
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    onClick={() => setDashboardPage('plans')}
+                    className="hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-[#035EF9]/5 hover:bg-[#035EF9]/10 transition-colors"
+                  >
+                    <Zap className="h-3.5 w-3.5 text-[#035EF9]" />
+                    <span className="text-xs font-medium text-[#035EF9]">4,505</span>
+                    <span className="text-[10px] text-[#035EF9]/60">credits</span>
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent>Your remaining credits</TooltipContent>
+              </Tooltip>
+
+              <Separator orientation="vertical" className="h-6 hidden sm:block" />
+
+              {/* Notifications */}
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button className="relative p-2 rounded-lg hover:bg-gray-50 transition-colors">
+                    <Bell className="h-[18px] w-[18px] text-gray-500" />
+                    <div className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full ring-2 ring-white" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent>Notifications</TooltipContent>
+              </Tooltip>
+
+              {/* User Dropdown */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button className="flex items-center gap-2 p-1 rounded-lg hover:bg-gray-50 transition-colors">
+                    <Avatar className="h-8 w-8">
+                      {user?.avatar ? (
+                        <AvatarImage src={user.avatar} alt={user?.name || 'User'} />
+                      ) : null}
+                      <AvatarFallback className="bg-[#0B0F1A] text-white text-xs font-medium">
+                        {user?.name?.split(' ').map((n) => n[0]).join('') || 'SC'}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="hidden lg:block text-left">
+                      <p className="text-sm font-medium text-[#0B0F1A] leading-tight">
+                        {user?.name || 'Demo User'}
+                      </p>
+                      <p className="text-[10px] text-gray-400 leading-tight">
+                        {activeWorkspace?.name || 'Professional Plan'}
+                      </p>
+                    </div>
+                    <ChevronDown className="h-3.5 w-3.5 text-gray-400 hidden lg:block" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-48">
+                  <DropdownMenuLabel className="font-normal">
+                    <div className="flex flex-col space-y-1">
+                      <p className="text-sm font-medium">{user?.name || 'Demo User'}</p>
+                      <p className="text-xs text-gray-500">
+                        {user?.email || 'demo@sellercrew.ai'}
+                      </p>
+                    </div>
+                  </DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem className="cursor-pointer">
+                    <User className="mr-2 h-4 w-4" />
+                    Profile
+                  </DropdownMenuItem>
+                  <DropdownMenuItem className="cursor-pointer">
+                    <Settings className="mr-2 h-4 w-4" />
+                    Settings
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    className="cursor-pointer text-red-600 focus:text-red-600"
+                    onClick={() => {
+                      logout();
+                      setView('landing');
+                    }}
+                  >
+                    <LogOut className="mr-2 h-4 w-4" />
+                    Log Out
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+          </header>
+
+          {/* ── Page Content ─────────────────────────────────────────── */}
+          <main className="flex-1 overflow-y-auto p-4 md:p-6">
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={dashboardPage}
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -6 }}
+                transition={{ duration: 0.2, ease: 'easeOut' }}
+              >
+                {renderPage(dashboardPage)}
+              </motion.div>
+            </AnimatePresence>
+          </main>
+        </div>
+      </div>
+    </TooltipProvider>
+  );
+}
