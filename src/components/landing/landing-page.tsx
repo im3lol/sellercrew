@@ -205,7 +205,7 @@ function AgentShowcase() {
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             transition={{ delay: 0.15 }}
-            className="grid grid-cols-3 lg:grid-cols-5 gap-4 sm:gap-5 w-full"
+            className="grid grid-cols-2 lg:grid-cols-5 gap-4 sm:gap-5 w-full"
           >
             {team.map((agent) => (
               <AgentCard key={agent.id} agent={agent} />
