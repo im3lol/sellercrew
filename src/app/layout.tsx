@@ -24,7 +24,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={`${outfit.variable} antialiased bg-background text-foreground font-sans`}>
+      <body suppressHydrationWarning className={`${outfit.variable} antialiased bg-background text-foreground font-sans`}>
         {children}
         <Toaster />
       </body>
