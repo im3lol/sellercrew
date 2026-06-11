@@ -81,7 +81,7 @@ export function Dashboard() {
         <div className="h-14 flex items-center px-4 border-b border-gray-100">
           <div className="flex items-center gap-2 min-w-0">
             <div className="w-8 h-8 rounded-lg overflow-hidden shrink-0">
-              <img src="/agents/ali.png" alt="SC" className="w-full h-full object-cover" />
+              <img src="/logo2.png" alt="SC" className="w-full h-full object-cover" />
             </div>
             {sidebarOpen && (
               <span className="font-bold text-[#0B0F1A] text-lg truncate">SellerCrew</span>

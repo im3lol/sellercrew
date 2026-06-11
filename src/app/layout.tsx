@@ -13,7 +13,7 @@ export const metadata: Metadata = {
   description: "AI-powered Amazon listing platform with a team of specialized AI agents to create, optimize, and analyze your product listings.",
   keywords: ["Amazon", "Listing", "AI", "SEO", "E-commerce", "Product Listing", "SellerCrew"],
   icons: {
-    icon: "/agents/ali.png",
+    icon: "/logo2.png",
   },
 };
 

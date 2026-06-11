@@ -491,7 +491,7 @@ function Footer() {
           <div>
             <div className="flex items-center gap-2 mb-4">
               <div className="w-8 h-8 rounded-lg overflow-hidden">
-                <img src="/agents/ali.png" alt="SellerCrew" className="w-full h-full object-cover" />
+                <img src="/logo2.png" alt="SellerCrew" className="w-full h-full object-cover" />
               </div>
               <span className="text-white font-bold text-lg">SellerCrew</span>
             </div>
@@ -556,7 +556,7 @@ function Navbar() {
       <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <div className="w-8 h-8 rounded-lg overflow-hidden">
-            <img src="/agents/ali.png" alt="SellerCrew" className="w-full h-full object-cover" />
+            <img src="/logo2.png" alt="SellerCrew" className="w-full h-full object-cover" />
           </div>
           <span className="text-white font-bold text-lg">SellerCrew</span>
         </div>
