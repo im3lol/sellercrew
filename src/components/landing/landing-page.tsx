@@ -132,20 +132,11 @@ function HeroSection() {
   );
 }
 
-function AgentCard({ agent, size = "default" }: { agent: typeof agents[0]; size?: "leader" | "default" }) {
-  const isLeader = size === "leader";
+function AgentCard({ agent }: { agent: typeof agents[0] }) {
   return (
-    <div
-      className={`group cursor-pointer rounded-2xl bg-white text-center transition-all duration-300 hover:-translate-y-1 ${
-        isLeader
-          ? "p-6 sm:p-8 shadow-sm hover:shadow-xl border border-gray-100"
-          : "p-4 sm:p-5 hover:shadow-lg border border-transparent hover:border-gray-100"
-      }`}
-    >
+    <div className="group cursor-pointer rounded-2xl bg-white p-4 text-center transition-all duration-300 hover:-translate-y-1 hover:shadow-lg">
       <div
-        className={`mx-auto rounded-2xl overflow-hidden transition-transform duration-300 group-hover:scale-105 ${
-          isLeader ? "w-20 h-20 sm:w-24 sm:h-24 mb-4" : "w-14 h-14 sm:w-16 sm:h-16 mb-3"
-        }`}
+        className="mx-auto w-16 h-16 sm:w-[72px] sm:h-[72px] rounded-2xl overflow-hidden transition-transform duration-300 group-hover:scale-105"
         style={{ backgroundColor: agent.color }}
       >
         <img
@@ -154,17 +145,8 @@ function AgentCard({ agent, size = "default" }: { agent: typeof agents[0]; size?
           className="w-full h-full object-cover"
         />
       </div>
-      <h3 className={`font-bold text-[#0B0F1A] ${isLeader ? "text-lg sm:text-xl" : "text-sm sm:text-base"}`}>
-        {agent.name}
-      </h3>
-      <p className={`text-gray-500 mt-0.5 leading-snug ${isLeader ? "text-sm" : "text-[11px] sm:text-xs"}`}>
-        {agent.role}
-      </p>
-      {isLeader && (
-        <div className="mt-3 inline-flex items-center gap-1.5 px-3 py-1 bg-[#0B0F1A] rounded-full">
-          <span className="text-xs text-white font-semibold">Team Leader</span>
-        </div>
-      )}
+      <h3 className="font-bold text-[#0B0F1A] text-sm sm:text-base mt-3">{agent.name}</h3>
+      <p className="text-[11px] sm:text-xs text-gray-500 mt-0.5 leading-snug">{agent.role}</p>
     </div>
   );
 }
@@ -172,12 +154,10 @@ function AgentCard({ agent, size = "default" }: { agent: typeof agents[0]; size?
 function AgentShowcase() {
   const ali = agents[0];
   const team = agents.slice(1);
-  const row1 = team.slice(0, 5);
-  const row2 = team.slice(5, 10);
 
   return (
     <section className="py-16 sm:py-24 bg-white">
-      <div className="max-w-5xl mx-auto px-4 sm:px-6">
+      <div className="max-w-3xl mx-auto px-4 sm:px-6">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
@@ -194,38 +174,40 @@ function AgentShowcase() {
         </motion.div>
 
         <div className="flex flex-col items-center gap-8 sm:gap-10">
-          {/* Ali - Chief Commander on top, centered */}
+          {/* Ali - Chief Commander Board */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             transition={{ delay: 0 }}
+            className="w-full max-w-xs sm:max-w-sm rounded-2xl bg-white shadow-md hover:shadow-xl transition-shadow duration-300 p-6 sm:p-8 text-center border border-gray-100"
           >
-            <AgentCard agent={ali} size="leader" />
+            <div
+              className="mx-auto w-20 h-20 sm:w-24 sm:h-24 rounded-2xl overflow-hidden"
+              style={{ backgroundColor: ali.color }}
+            >
+              <img
+                src={ali.avatar}
+                alt={ali.name}
+                className="w-full h-full object-cover"
+              />
+            </div>
+            <h3 className="font-bold text-[#0B0F1A] text-lg sm:text-xl mt-4">{ali.name}</h3>
+            <p className="text-sm text-gray-500 mt-1">{ali.role}</p>
+            <div className="mt-3 inline-flex items-center gap-1.5 px-3 py-1 bg-[#0B0F1A] rounded-full">
+              <span className="text-xs text-white font-semibold">Team Leader</span>
+            </div>
           </motion.div>
 
-          {/* Row 1: 5 agents - responsive grid */}
+          {/* Team: 3 per row */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
-            transition={{ delay: 0.1 }}
-            className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4 w-full max-w-4xl"
+            transition={{ delay: 0.15 }}
+            className="grid grid-cols-3 gap-4 sm:gap-5 w-full"
           >
-            {row1.map((agent) => (
-              <AgentCard key={agent.id} agent={agent} />
-            ))}
-          </motion.div>
-
-          {/* Row 2: 5 agents - responsive grid */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ delay: 0.2 }}
-            className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4 w-full max-w-4xl"
-          >
-            {row2.map((agent) => (
+            {team.map((agent) => (
               <AgentCard key={agent.id} agent={agent} />
             ))}
           </motion.div>
