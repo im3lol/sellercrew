@@ -157,7 +157,7 @@ function AgentShowcase() {
 
   return (
     <section className="py-16 sm:py-24 bg-white">
-      <div className="max-w-3xl mx-auto px-4 sm:px-6">
+      <div className="max-w-5xl mx-auto px-4 sm:px-6">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
@@ -174,13 +174,13 @@ function AgentShowcase() {
         </motion.div>
 
         <div className="flex flex-col items-center gap-8 sm:gap-10">
-          {/* Ali - Chief Commander Board */}
+          {/* Ali - Chief Commander, no border/card */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             transition={{ delay: 0 }}
-            className="w-full max-w-xs sm:max-w-sm rounded-2xl bg-white shadow-md hover:shadow-xl transition-shadow duration-300 p-6 sm:p-8 text-center border border-gray-100"
+            className="text-center"
           >
             <div
               className="mx-auto w-20 h-20 sm:w-24 sm:h-24 rounded-2xl overflow-hidden"
@@ -199,13 +199,13 @@ function AgentShowcase() {
             </div>
           </motion.div>
 
-          {/* Team: 3 per row */}
+          {/* Team: 3 per row mobile, 5 per row desktop */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             transition={{ delay: 0.15 }}
-            className="grid grid-cols-3 gap-4 sm:gap-5 w-full"
+            className="grid grid-cols-3 lg:grid-cols-5 gap-4 sm:gap-5 w-full"
           >
             {team.map((agent) => (
               <AgentCard key={agent.id} agent={agent} />
