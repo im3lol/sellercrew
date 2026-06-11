@@ -132,82 +132,103 @@ function HeroSection() {
   );
 }
 
-function AgentShowcase() {
+function AgentCard({ agent, size = "default" }: { agent: typeof agents[0]; size?: "leader" | "default" }) {
+  const isLeader = size === "leader";
   return (
-    <section className="py-24 bg-white">
-      <div className="max-w-7xl mx-auto px-6">
+    <div
+      className={`group cursor-pointer rounded-2xl bg-white text-center transition-all duration-300 hover:-translate-y-1 ${
+        isLeader
+          ? "p-6 sm:p-8 shadow-sm hover:shadow-xl border border-gray-100"
+          : "p-4 sm:p-5 hover:shadow-lg border border-transparent hover:border-gray-100"
+      }`}
+    >
+      <div
+        className={`mx-auto rounded-2xl overflow-hidden transition-transform duration-300 group-hover:scale-105 ${
+          isLeader ? "w-20 h-20 sm:w-24 sm:h-24 mb-4" : "w-14 h-14 sm:w-16 sm:h-16 mb-3"
+        }`}
+        style={{ backgroundColor: agent.color }}
+      >
+        <img
+          src={agent.avatar}
+          alt={agent.name}
+          className="w-full h-full object-cover"
+        />
+      </div>
+      <h3 className={`font-bold text-[#0B0F1A] ${isLeader ? "text-lg sm:text-xl" : "text-sm sm:text-base"}`}>
+        {agent.name}
+      </h3>
+      <p className={`text-gray-500 mt-0.5 leading-snug ${isLeader ? "text-sm" : "text-[11px] sm:text-xs"}`}>
+        {agent.role}
+      </p>
+      {isLeader && (
+        <div className="mt-3 inline-flex items-center gap-1.5 px-3 py-1 bg-[#0B0F1A] rounded-full">
+          <span className="text-xs text-white font-semibold">Team Leader</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function AgentShowcase() {
+  const ali = agents[0];
+  const team = agents.slice(1);
+  const row1 = team.slice(0, 5);
+  const row2 = team.slice(5, 10);
+
+  return (
+    <section className="py-16 sm:py-24 bg-white">
+      <div className="max-w-5xl mx-auto px-4 sm:px-6">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
-          className="text-center mb-16"
+          className="text-center mb-10 sm:mb-14"
         >
-          <h2 className="text-3xl md:text-4xl font-bold text-[#0B0F1A] mb-4">
+          <h2 className="text-3xl sm:text-4xl font-bold text-[#0B0F1A] mb-4">
             Meet Your AI Team
           </h2>
-          <p className="text-lg text-gray-500 max-w-2xl mx-auto">
+          <p className="text-base sm:text-lg text-gray-500 max-w-2xl mx-auto">
             11 specialized agents, each an expert in their domain, working together to create
             perfect Amazon listings.
           </p>
         </motion.div>
 
-        <div className="flex flex-col items-center gap-6">
+        <div className="flex flex-col items-center gap-8 sm:gap-10">
           {/* Ali - Chief Commander on top, centered */}
-          {(() => {
-            const ali = agents[0];
-            return (
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ delay: 0 }}
-                className="agent-glow group cursor-pointer rounded-xl border border-gray-100 bg-white px-8 py-6 text-center hover:border-gray-200 transition-all hover:shadow-lg"
-              >
-                <div
-                  className="w-20 h-20 mx-auto rounded-xl overflow-hidden mb-3 border-2 transition-transform group-hover:scale-105"
-                  style={{ borderColor: ali.color }}
-                >
-                  <img
-                    src={ali.avatar}
-                    alt={ali.name}
-                    className="w-full h-full object-cover"
-                  />
-                </div>
-                <h3 className="font-semibold text-[#0B0F1A] text-base">{ali.name}</h3>
-                <p className="text-xs text-gray-500 mt-1">{ali.role}</p>
-                <div className="mt-2 inline-flex items-center gap-1 px-2 py-0.5 bg-[#0B0F1A] rounded-full">
-                  <span className="text-[10px] text-white font-medium">Team Leader</span>
-                </div>
-              </motion.div>
-            );
-          })()}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ delay: 0 }}
+          >
+            <AgentCard agent={ali} size="leader" />
+          </motion.div>
 
-          {/* Rest of the team: 2 rows of 5 */}
-          <div className="grid grid-cols-5 gap-4 max-w-3xl">
-            {agents.slice(1).map((agent, i) => (
-              <motion.div
-                key={agent.id}
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ delay: (i + 1) * 0.05 }}
-                className="agent-glow group cursor-pointer rounded-xl border border-gray-100 bg-white p-5 text-center hover:border-gray-200 transition-all"
-              >
-                <div
-                  className="w-16 h-16 mx-auto rounded-xl overflow-hidden mb-3 border-2 transition-transform group-hover:scale-105"
-                  style={{ borderColor: agent.color }}
-                >
-                  <img
-                    src={agent.avatar}
-                    alt={agent.name}
-                    className="w-full h-full object-cover"
-                  />
-                </div>
-                <h3 className="font-semibold text-[#0B0F1A] text-sm">{agent.name}</h3>
-                <p className="text-xs text-gray-500 mt-1">{agent.role}</p>
-              </motion.div>
+          {/* Row 1: 5 agents - responsive grid */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ delay: 0.1 }}
+            className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4 w-full max-w-4xl"
+          >
+            {row1.map((agent) => (
+              <AgentCard key={agent.id} agent={agent} />
             ))}
-          </div>
+          </motion.div>
+
+          {/* Row 2: 5 agents - responsive grid */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ delay: 0.2 }}
+            className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4 w-full max-w-4xl"
+          >
+            {row2.map((agent) => (
+              <AgentCard key={agent.id} agent={agent} />
+            ))}
+          </motion.div>
         </div>
       </div>
     </section>
