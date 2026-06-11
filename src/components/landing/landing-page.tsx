@@ -151,30 +151,63 @@ function AgentShowcase() {
           </p>
         </motion.div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-          {agents.map((agent, i) => (
-            <motion.div
-              key={agent.id}
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ delay: i * 0.05 }}
-              className="agent-glow group cursor-pointer rounded-xl border border-gray-100 bg-white p-5 text-center hover:border-gray-200 transition-all"
-            >
-              <div
-                className="w-16 h-16 mx-auto rounded-xl overflow-hidden mb-3 border-2 transition-transform group-hover:scale-105"
-                style={{ borderColor: agent.color }}
+        <div className="flex flex-col items-center gap-6">
+          {/* Ali - Chief Commander on top, centered */}
+          {(() => {
+            const ali = agents[0];
+            return (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ delay: 0 }}
+                className="agent-glow group cursor-pointer rounded-xl border border-gray-100 bg-white px-8 py-6 text-center hover:border-gray-200 transition-all hover:shadow-lg"
               >
-                <img
-                  src={agent.avatar}
-                  alt={agent.name}
-                  className="w-full h-full object-cover"
-                />
-              </div>
-              <h3 className="font-semibold text-[#0B0F1A] text-sm">{agent.name}</h3>
-              <p className="text-xs text-gray-500 mt-1">{agent.role}</p>
-            </motion.div>
-          ))}
+                <div
+                  className="w-20 h-20 mx-auto rounded-xl overflow-hidden mb-3 border-2 transition-transform group-hover:scale-105"
+                  style={{ borderColor: ali.color }}
+                >
+                  <img
+                    src={ali.avatar}
+                    alt={ali.name}
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+                <h3 className="font-semibold text-[#0B0F1A] text-base">{ali.name}</h3>
+                <p className="text-xs text-gray-500 mt-1">{ali.role}</p>
+                <div className="mt-2 inline-flex items-center gap-1 px-2 py-0.5 bg-[#0B0F1A] rounded-full">
+                  <span className="text-[10px] text-white font-medium">Team Leader</span>
+                </div>
+              </motion.div>
+            );
+          })()}
+
+          {/* Rest of the team: 2 rows of 5 */}
+          <div className="grid grid-cols-5 gap-4 max-w-3xl">
+            {agents.slice(1).map((agent, i) => (
+              <motion.div
+                key={agent.id}
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ delay: (i + 1) * 0.05 }}
+                className="agent-glow group cursor-pointer rounded-xl border border-gray-100 bg-white p-5 text-center hover:border-gray-200 transition-all"
+              >
+                <div
+                  className="w-16 h-16 mx-auto rounded-xl overflow-hidden mb-3 border-2 transition-transform group-hover:scale-105"
+                  style={{ borderColor: agent.color }}
+                >
+                  <img
+                    src={agent.avatar}
+                    alt={agent.name}
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+                <h3 className="font-semibold text-[#0B0F1A] text-sm">{agent.name}</h3>
+                <p className="text-xs text-gray-500 mt-1">{agent.role}</p>
+              </motion.div>
+            ))}
+          </div>
         </div>
       </div>
     </section>
