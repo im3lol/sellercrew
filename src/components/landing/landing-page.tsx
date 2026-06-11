@@ -493,7 +493,7 @@ function Footer() {
               <div className="w-8 h-8 rounded-lg overflow-hidden">
                 <img src="/logo2.png" alt="SellerCrew" className="w-full h-full object-cover" />
               </div>
-              <span className="text-white font-bold text-lg">SellerCrew</span>
+              <img src="/logo-text.png" alt="SellerCrew" className="h-6 object-contain" />
             </div>
             <p className="text-sm leading-relaxed">
               Your AI Product Listing Team. Specialized agents working together to create
@@ -558,7 +558,7 @@ function Navbar() {
           <div className="w-8 h-8 rounded-lg overflow-hidden">
             <img src="/logo2.png" alt="SellerCrew" className="w-full h-full object-cover" />
           </div>
-          <span className="text-white font-bold text-lg">SellerCrew</span>
+          <img src="/logo-text.png" alt="SellerCrew" className="h-6 object-contain" />
         </div>
         <div className="hidden md:flex items-center gap-8">
           <a href="#features" className="text-sm text-white/70 hover:text-white transition-colors">

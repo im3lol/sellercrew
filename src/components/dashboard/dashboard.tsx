@@ -84,7 +84,7 @@ export function Dashboard() {
               <img src="/logo2.png" alt="SC" className="w-full h-full object-cover" />
             </div>
             {sidebarOpen && (
-              <span className="font-bold text-[#0B0F1A] text-lg truncate">SellerCrew</span>
+              <img src="/logo-text.png" alt="SellerCrew" className="h-6 object-contain" />
             )}
           </div>
         </div>
