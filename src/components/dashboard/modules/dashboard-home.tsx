@@ -49,7 +49,7 @@ export function DashboardHome() {
             <div>
               <h2 className="text-2xl font-bold mb-2">Welcome back! 👋</h2>
               <p className="text-white/60 max-w-lg">
-                Your AI team is ready. You have 42 credits remaining. Start a new listing or
+                Your AI team is ready. You have 4,505 credits remaining. Start a new listing or
                 continue where you left off.
               </p>
               <div className="flex gap-3 mt-4">
@@ -88,9 +88,9 @@ export function DashboardHome() {
           <div className="mt-6">
             <div className="flex items-center justify-between text-sm mb-2">
               <span className="text-white/60">Credits Used</span>
-              <span className="text-white">58 / 100</span>
+              <span className="text-white">495 / 5,000</span>
             </div>
-            <Progress value={58} className="h-2 bg-white/10" />
+            <Progress value={9.9} className="h-2 bg-white/10" />
           </div>
         </CardContent>
       </Card>

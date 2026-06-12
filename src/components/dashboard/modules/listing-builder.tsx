@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import sanitizeHtml from "sanitize-html";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -29,6 +30,7 @@ interface ListingResult {
   description: string;
   keywords: string[];
   complianceScore: number;
+  complianceNotes?: string;
 }
 
 const sampleListing: ListingResult = {
@@ -64,17 +66,63 @@ export function ListingBuilder() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [result, setResult] = useState<ListingResult | null>(null);
   const [activeTab, setActiveTab] = useState("input");
+  const safeDescription = useMemo(
+    () =>
+      result
+        ? sanitizeHtml(result.description, {
+            allowedTags: ["h2", "h3", "p", "strong", "em", "ul", "ol", "li", "br"],
+            allowedAttributes: {},
+          })
+        : "",
+    [result]
+  );
 
   const handleGenerate = async () => {
+    if (productName.trim().length < 2) {
+      toast.error("Enter a product name before generating.");
+      return;
+    }
+
     setIsGenerating(true);
     setActiveTab("result");
 
-    // Simulate AI generation with delay
-    setTimeout(() => {
-      setResult(sampleListing);
-      setIsGenerating(false);
+    try {
+      const response = await fetch("/api/generate-listing", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          productName: productName.trim(),
+          productDescription: productDescription.trim(),
+          keywords: keywords.map((value) => value.trim()).filter(Boolean),
+          competitorAsins: competitorAsins.map((value) => value.trim()).filter(Boolean),
+        }),
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Listing generation failed.");
+      }
+
+      const listing = data.listing;
+      if (!listing?.title || !Array.isArray(listing.bullets)) {
+        throw new Error("The AI returned an incomplete listing.");
+      }
+
+      setResult({
+        title: listing.title,
+        bullets: listing.bullets,
+        description: listing.description || "",
+        keywords: listing.backendKeywords || listing.keywords || [],
+        complianceScore: Number(listing.complianceScore) || 0,
+        complianceNotes: listing.complianceNotes,
+      });
       toast.success("Listing generated successfully!");
-    }, 3000);
+    } catch (error) {
+      setActiveTab("input");
+      toast.error(error instanceof Error ? error.message : "Listing generation failed.");
+    } finally {
+      setIsGenerating(false);
+    }
   };
 
   const addKeyword = () => setKeywords([...keywords, ""]);
@@ -374,7 +422,7 @@ export function ListingBuilder() {
                 <CardContent>
                   <div
                     className="text-sm text-[#0B0F1A] leading-relaxed prose prose-sm max-w-none"
-                    dangerouslySetInnerHTML={{ __html: result.description }}
+                    dangerouslySetInnerHTML={{ __html: safeDescription }}
                   />
                 </CardContent>
               </Card>

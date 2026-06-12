@@ -1,16 +1,25 @@
 import { NextRequest, NextResponse } from "next/server";
+import sanitizeHtml from "sanitize-html";
+import { z } from "zod";
+
+const requestSchema = z.object({
+  productName: z.string().trim().min(2).max(200),
+  productDescription: z.string().trim().max(5000).optional().default(""),
+  keywords: z.array(z.string().trim().min(1).max(100)).max(30).optional().default([]),
+  competitorAsins: z.array(z.string().trim().min(1).max(20)).max(20).optional().default([]),
+});
 
 export async function POST(request: NextRequest) {
   try {
-    const { productName, productDescription, keywords, competitorAsins } = await request.json();
-
-    if (!productName) {
+    const parsed = requestSchema.safeParse(await request.json());
+    if (!parsed.success) {
       return NextResponse.json(
-        { error: "Product name is required" },
+        { error: "Please provide valid product information." },
         { status: 400 }
       );
     }
 
+    const { productName, productDescription, keywords, competitorAsins } = parsed.data;
     const ZAI = (await import("z-ai-web-dev-sdk")).default;
     const zai = await ZAI.create();
 
@@ -51,6 +60,13 @@ Ensure the listing is Amazon-compliant, keyword-optimized, and conversion-focuse
       result = { rawContent: completion.choices?.[0]?.message?.content };
     }
 
+    if (result.description) {
+      result.description = sanitizeHtml(result.description, {
+        allowedTags: ["h2", "h3", "p", "strong", "em", "ul", "ol", "li", "br"],
+        allowedAttributes: {},
+      });
+    }
+
     return NextResponse.json({
       success: true,
       listing: result,
@@ -58,10 +74,15 @@ Ensure the listing is Amazon-compliant, keyword-optimized, and conversion-focuse
     });
   } catch (error: unknown) {
     console.error("Listing generation error:", error);
-    const errorMessage = error instanceof Error ? error.message : "Internal server error";
+    const isConfigurationError =
+      error instanceof Error && error.message.toLowerCase().includes("configuration");
     return NextResponse.json(
-      { error: errorMessage },
-      { status: 500 }
+      {
+        error: isConfigurationError
+          ? "AI generation is not configured on this server."
+          : "Listing generation failed. Please try again.",
+      },
+      { status: isConfigurationError ? 503 : 500 }
     );
   }
 }

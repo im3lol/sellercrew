@@ -45,10 +45,15 @@ export async function POST(request: NextRequest) {
     });
   } catch (error: unknown) {
     console.error("Agent chat error:", error);
-    const errorMessage = error instanceof Error ? error.message : "Internal server error";
+    const isConfigurationError =
+      error instanceof Error && error.message.toLowerCase().includes("configuration");
     return NextResponse.json(
-      { error: errorMessage },
-      { status: 500 }
+      {
+        error: isConfigurationError
+          ? "AI chat is not configured on this server."
+          : "Agent chat failed. Please try again.",
+      },
+      { status: isConfigurationError ? 503 : 500 }
     );
   }
 }

@@ -24,6 +24,7 @@ import {
   EyeOff,
   Loader2,
   ArrowLeft,
+  ArrowRight,
   Mail,
   Lock,
   User,
@@ -32,6 +33,7 @@ import {
   CheckCircle2,
 } from 'lucide-react';
 import Image from 'next/image';
+import { agents } from '@/lib/agents';
 
 // ─── Animation Variants ──────────────────────────────────────────────────────
 
@@ -60,134 +62,165 @@ const staggerContainer = {
   },
 };
 
+const authInputClass =
+  'h-12 rounded-xl border-slate-200 bg-white pl-11 text-[15px] shadow-sm shadow-slate-200/30 placeholder:text-slate-400 focus-visible:border-[#7E44E6] focus-visible:ring-4 focus-visible:ring-[#7E44E6]/10';
+
+const authPrimaryClass =
+  'h-12 w-full rounded-xl border-0 bg-gradient-to-r from-[#035EF9] via-[#7E44E6] to-[#F84D8E] text-[15px] font-semibold text-white shadow-lg shadow-[#7E44E6]/20 transition-all hover:brightness-105 active:scale-[0.99]';
+
+function MobileBrand() {
+  const setView = useAppStore((state) => state.setView);
+
+  return (
+    <motion.button
+      type="button"
+      onClick={() => setView('landing')}
+      variants={fadeInUp}
+      transition={{ duration: 0.4 }}
+      className="mb-9 flex items-center gap-2.5 lg:hidden"
+    >
+      <Image src="/logo2.png" alt="" width={42} height={42} className="rounded-xl" />
+      <span className="text-xl font-extrabold tracking-[-0.055em] text-[#0B0F1A]">
+        sellercrew
+      </span>
+    </motion.button>
+  );
+}
+
 // ─── Left Panel Component ────────────────────────────────────────────────────
 
 function AuthLeftPanel() {
+  const setView = useAppStore((state) => state.setView);
+
   return (
-    <div className="hidden lg:flex lg:w-[480px] xl:w-[540px] relative overflow-hidden bg-[#0B0F1A] flex-col items-center justify-center p-10">
-      {/* Gradient orbs */}
-      <div className="absolute top-0 left-0 w-80 h-80 bg-[#035EF9]/15 rounded-full blur-[100px]" />
-      <div className="absolute bottom-0 right-0 w-96 h-96 bg-purple-500/10 rounded-full blur-[120px]" />
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-cyan-500/5 rounded-full blur-[100px]" />
-
-      {/* Grid pattern */}
-      <div
-        className="absolute inset-0 opacity-[0.04]"
-        style={{
-          backgroundImage:
-            'linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px)',
-          backgroundSize: '48px 48px',
-        }}
-      />
-
-      {/* Decorative floating elements */}
+    <aside className="relative hidden h-full w-[46%] max-w-[680px] overflow-hidden bg-[#080C16] p-10 lg:flex xl:p-14">
+      <div className="sellercrew-grid absolute inset-0 opacity-25" />
       <motion.div
-        className="absolute top-16 left-16 w-3 h-3 rounded-full bg-[#035EF9]/30"
-        animate={{ y: [0, -12, 0] }}
-        transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }}
+        animate={{ x: [0, 35, 0], y: [0, -20, 0] }}
+        transition={{ duration: 14, repeat: Infinity, ease: 'easeInOut' }}
+        className="absolute -left-32 top-10 size-96 rounded-full bg-[#035EF9]/20 blur-[110px]"
       />
       <motion.div
-        className="absolute top-32 right-20 w-2 h-2 rounded-full bg-purple-400/30"
-        animate={{ y: [0, 8, 0] }}
-        transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut', delay: 1 }}
-      />
-      <motion.div
-        className="absolute bottom-32 left-24 w-4 h-4 rounded-full bg-cyan-400/20"
-        animate={{ y: [0, -10, 0] }}
-        transition={{ duration: 5, repeat: Infinity, ease: 'easeInOut', delay: 0.5 }}
+        animate={{ x: [0, -25, 0], y: [0, 25, 0] }}
+        transition={{ duration: 17, repeat: Infinity, ease: 'easeInOut' }}
+        className="absolute -right-24 bottom-10 size-[430px] rounded-full bg-[#F84D8E]/15 blur-[120px]"
       />
 
-      {/* Content */}
-      <div className="relative z-10 flex flex-col items-center text-center">
-        {/* Logo */}
-        <motion.div
-          initial={{ opacity: 0, scale: 0.9 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.6, delay: 0.2 }}
-          className="mb-8"
+      <div className="relative z-10 flex w-full flex-col">
+        <button
+          type="button"
+          onClick={() => setView('landing')}
+          className="flex w-fit items-center gap-2.5"
         >
-          <div className="w-[72px] h-[72px] rounded-2xl bg-white/10 backdrop-blur-sm border border-white/10 flex items-center justify-center p-2 shadow-lg shadow-black/20">
-            <Image
-              src="/logo2.png"
-              alt="SellerCrew"
-              width={56}
-              height={56}
-              className="object-contain"
-            />
-          </div>
-        </motion.div>
-
-        {/* Logo text */}
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.35 }}
-          className="mb-6"
-        >
-          <Image
-            src="/logo-text.png"
-            alt="SellerCrew"
-            width={180}
-            height={36}
-            className="object-contain"
-            style={{ filter: 'brightness(0) invert(1)' }}
-          />
-        </motion.div>
-
-        {/* Title */}
-        <motion.h2
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.5 }}
-          className="text-2xl font-bold text-white mb-4 leading-tight"
-        >
-          Your AI Product
-          <br />
-          <span
-            className="bg-gradient-to-r from-[#035EF9] via-cyan-400 to-[#035EF9] bg-clip-text"
-            style={{ WebkitTextFillColor: 'transparent' }}
-          >
-            Listing Team
+          <Image src="/logo2.png" alt="" width={42} height={42} className="rounded-xl" />
+          <span className="text-xl font-extrabold tracking-[-0.055em] text-white">
+            sellercrew
           </span>
-        </motion.h2>
+        </button>
 
-        {/* Subtitle */}
-        <motion.p
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.65 }}
-          className="text-white/50 text-sm max-w-[320px] leading-relaxed mb-10"
-        >
-          Work with specialized AI agents that handle every step of your Amazon
-          product listing journey.
-        </motion.p>
+        <div className="my-auto py-10">
+          <motion.p
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="text-xs font-bold uppercase tracking-[0.22em] text-white/40"
+          >
+            Your AI product listing team
+          </motion.p>
+          <motion.h2
+            initial={{ opacity: 0, y: 18 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.08 }}
+            className="mt-5 max-w-lg text-4xl font-bold leading-[1.04] tracking-[-0.055em] text-white xl:text-5xl"
+          >
+            Sign in and put the
+            <span className="sellercrew-gradient-text block pb-1">whole crew to work.</span>
+          </motion.h2>
+          <motion.p
+            initial={{ opacity: 0, y: 18 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.16 }}
+            className="mt-5 max-w-md text-sm leading-7 text-white/48"
+          >
+            Research, strategy, copy, SEO, compliance, creative direction, and QA
+            stay connected in one Amazon listing workflow.
+          </motion.p>
 
-        {/* Feature pills */}
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.8 }}
-          className="flex flex-col gap-3 w-full max-w-[300px]"
-        >
-          {[
-            { icon: Sparkles, text: 'AI-Powered Listing Optimization' },
-            { icon: ShieldCheck, text: 'Compliance-First Approach' },
-            { icon: CheckCircle2, text: 'Multi-Agent Collaboration' },
-          ].map((feature, i) => (
-            <motion.div
-              key={feature.text}
-              initial={{ opacity: 0, x: -10 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.4, delay: 0.9 + i * 0.1 }}
-              className="flex items-center gap-3 px-4 py-2.5 rounded-xl bg-white/[0.04] border border-white/[0.06]"
-            >
-              <feature.icon className="h-4 w-4 text-[#035EF9] shrink-0" />
-              <span className="text-xs text-white/70">{feature.text}</span>
-            </motion.div>
-          ))}
-        </motion.div>
+          <motion.div
+            initial={{ opacity: 0, y: 22 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.25 }}
+            className="mt-9"
+          >
+            <div className="flex items-center gap-2 text-xs text-white/40">
+              <motion.span
+                animate={{ opacity: [0.35, 1, 0.35] }}
+                transition={{ duration: 1.5, repeat: Infinity }}
+                className="size-2 rounded-full bg-[#36B46F]"
+              />
+              11 specialist agents ready
+            </div>
+
+            <div className="mt-5 flex justify-center">
+              <motion.div
+                initial={{ opacity: 0, scale: 0.8 }}
+                animate={{ opacity: 1, scale: 1, y: [0, -4, 0] }}
+                transition={{
+                  opacity: { delay: 0.3 },
+                  scale: { delay: 0.3 },
+                  y: { duration: 4, repeat: Infinity, ease: 'easeInOut' },
+                }}
+                className="flex flex-col items-center"
+              >
+                <div
+                  className="size-14 overflow-hidden rounded-2xl shadow-lg shadow-black/20"
+                  style={{ backgroundColor: agents[0].color }}
+                >
+                  <Image
+                    src={agents[0].avatar}
+                    alt={agents[0].name}
+                    width={56}
+                    height={56}
+                  />
+                </div>
+                <p className="mt-2 text-xs font-semibold text-white/75">{agents[0].name}</p>
+                <p className="mt-0.5 text-[9px] text-white/30">{agents[0].role}</p>
+              </motion.div>
+            </div>
+
+            <div className="mt-5 grid grid-cols-5 gap-x-3 gap-y-5">
+              {agents.slice(1).map((agent, index) => (
+                <motion.div
+                  key={agent.id}
+                  initial={{ opacity: 0, scale: 0.8 }}
+                  animate={{ opacity: 1, scale: 1, y: [0, index % 2 ? 3 : -3, 0] }}
+                  transition={{
+                    opacity: { delay: 0.3 + index * 0.04 },
+                    scale: { delay: 0.3 + index * 0.04 },
+                    y: { duration: 4 + index * 0.2, repeat: Infinity, ease: 'easeInOut' },
+                  }}
+                  className="min-w-0 text-center"
+                >
+                  <div
+                    className="mx-auto size-11 overflow-hidden rounded-xl shadow-md shadow-black/15"
+                    style={{ backgroundColor: agent.color }}
+                  >
+                    <Image src={agent.avatar} alt={agent.name} width={44} height={44} />
+                  </div>
+                  <p className="mt-1.5 truncate text-[10px] font-medium text-white/50">
+                    {agent.name}
+                  </p>
+                </motion.div>
+              ))}
+            </div>
+          </motion.div>
+        </div>
+
+        <div className="flex items-center gap-2 text-xs text-white/30">
+          <Sparkles className="size-3.5 text-[#7E44E6]" />
+          Structured for Amazon listing teams
+        </div>
       </div>
-    </div>
+    </aside>
   );
 }
 
@@ -195,13 +228,13 @@ function AuthLeftPanel() {
 
 function AuthLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="min-h-screen flex bg-white">
+    <div className="flex h-dvh overflow-hidden bg-[#F7F8FC]">
       {/* Left dark panel — hidden on mobile */}
       <AuthLeftPanel />
 
       {/* Right form panel */}
-      <div className="flex-1 flex items-center justify-center p-6 sm:p-8 lg:p-12">
-        <div className="w-full max-w-[420px]">
+      <div className="flex h-full min-w-0 flex-1 flex-col overflow-y-auto px-5 py-5 sm:px-8 lg:px-12">
+        <div className="mx-auto my-auto w-full max-w-[460px] shrink-0 rounded-[2rem] border border-slate-200/80 bg-white p-6 shadow-[0_30px_80px_-45px_rgba(11,15,26,0.35)] sm:p-8">
           <AnimatePresence mode="wait">
             {children}
           </AnimatePresence>
@@ -269,43 +302,20 @@ function LoginPage() {
         animate="animate"
         className="flex flex-col"
       >
-        {/* Mobile logo */}
-        <motion.div
-          variants={fadeInUp}
-          transition={{ duration: 0.4 }}
-          className="flex items-center gap-3 mb-8 lg:hidden"
-        >
-          <div className="w-10 h-10 rounded-xl bg-[#0B0F1A] flex items-center justify-center p-1.5">
-            <Image
-              src="/logo2.png"
-              alt="SellerCrew"
-              width={28}
-              height={28}
-              className="object-contain"
-              style={{ filter: 'brightness(0) invert(1)' }}
-            />
-          </div>
-          <Image
-            src="/logo-text.png"
-            alt="SellerCrew"
-            width={120}
-            height={24}
-            className="object-contain"
-          />
-        </motion.div>
+        <MobileBrand />
 
         {/* Header */}
         <motion.div variants={fadeInUp} transition={{ duration: 0.4 }}>
-          <h1 className="text-2xl sm:text-[28px] font-bold text-[#0B0F1A] tracking-tight">
+          <h1 className="text-3xl font-bold tracking-[-0.04em] text-[#0B0F1A] sm:text-4xl">
             Welcome back
           </h1>
-          <p className="text-sm text-gray-500 mt-1.5">
-            Sign in to your SellerCrew account
+          <p className="mt-2 text-sm leading-6 text-slate-500">
+            Sign in to continue your Amazon listing workflow.
           </p>
         </motion.div>
 
         {/* Form */}
-        <form onSubmit={handleSubmit} className="mt-8 flex flex-col gap-5">
+        <form onSubmit={handleSubmit} className="mt-7 flex flex-col gap-4">
           <motion.div variants={fadeInUp} transition={{ duration: 0.4 }} className="flex flex-col gap-2">
             <Label htmlFor="login-email" className="text-[13px] font-medium text-gray-700">
               Email address
@@ -321,7 +331,7 @@ function LoginPage() {
                   setEmail(e.target.value);
                   if (errors.email) setErrors((prev) => ({ ...prev, email: undefined }));
                 }}
-                className={`h-11 pl-10 bg-gray-50/80 border-gray-200 text-[15px] placeholder:text-gray-400 focus-visible:bg-white focus-visible:border-[#035EF9] focus-visible:ring-[#035EF9]/20 ${
+                className={`${authInputClass} ${
                   errors.email ? 'border-red-400 focus-visible:border-red-400 focus-visible:ring-red-400/20' : ''
                 }`}
                 aria-invalid={!!errors.email}
@@ -356,7 +366,7 @@ function LoginPage() {
                   setPassword(e.target.value);
                   if (errors.password) setErrors((prev) => ({ ...prev, password: undefined }));
                 }}
-                className={`h-11 pl-10 pr-10 bg-gray-50/80 border-gray-200 text-[15px] placeholder:text-gray-400 focus-visible:bg-white focus-visible:border-[#035EF9] focus-visible:ring-[#035EF9]/20 ${
+                className={`${authInputClass} pr-11 ${
                   errors.password ? 'border-red-400 focus-visible:border-red-400 focus-visible:ring-red-400/20' : ''
                 }`}
                 aria-invalid={!!errors.password}
@@ -379,7 +389,7 @@ function LoginPage() {
             <Button
               type="submit"
               disabled={isLoading}
-              className="w-full h-11 bg-[#035EF9] hover:bg-[#024fd4] text-white font-semibold text-[15px] rounded-lg shadow-md shadow-[#035EF9]/20 transition-all active:scale-[0.98]"
+              className={authPrimaryClass}
             >
               {isLoading ? (
                 <>
@@ -397,7 +407,7 @@ function LoginPage() {
         <motion.div
           variants={fadeInUp}
           transition={{ duration: 0.4 }}
-          className="relative my-8"
+          className="relative my-6"
         >
           <div className="absolute inset-0 flex items-center">
             <div className="w-full border-t border-gray-200" />
@@ -412,7 +422,7 @@ function LoginPage() {
           <Button
             type="button"
             variant="outline"
-            className="w-full h-11 border-gray-200 bg-gray-50/50 hover:bg-gray-100 text-gray-700 font-medium text-[15px] rounded-lg transition-all"
+            className="h-12 w-full rounded-xl border-slate-200 bg-white text-[15px] font-medium text-slate-700 shadow-sm hover:bg-slate-50"
             onClick={() => {
               setIsLoading(true);
               setTimeout(() => {
@@ -451,7 +461,7 @@ function LoginPage() {
         <motion.p
           variants={fadeInUp}
           transition={{ duration: 0.4 }}
-          className="text-center text-sm text-gray-500 mt-8"
+          className="mt-6 text-center text-sm text-gray-500"
         >
           Don&apos;t have an account?{' '}
           <button
@@ -560,43 +570,20 @@ function RegisterPage() {
         animate="animate"
         className="flex flex-col"
       >
-        {/* Mobile logo */}
-        <motion.div
-          variants={fadeInUp}
-          transition={{ duration: 0.4 }}
-          className="flex items-center gap-3 mb-8 lg:hidden"
-        >
-          <div className="w-10 h-10 rounded-xl bg-[#0B0F1A] flex items-center justify-center p-1.5">
-            <Image
-              src="/logo2.png"
-              alt="SellerCrew"
-              width={28}
-              height={28}
-              className="object-contain"
-              style={{ filter: 'brightness(0) invert(1)' }}
-            />
-          </div>
-          <Image
-            src="/logo-text.png"
-            alt="SellerCrew"
-            width={120}
-            height={24}
-            className="object-contain"
-          />
-        </motion.div>
+        <MobileBrand />
 
         {/* Header */}
         <motion.div variants={fadeInUp} transition={{ duration: 0.4 }}>
-          <h1 className="text-2xl sm:text-[28px] font-bold text-[#0B0F1A] tracking-tight">
+          <h1 className="text-3xl font-bold tracking-[-0.04em] text-[#0B0F1A] sm:text-4xl">
             Create your account
           </h1>
-          <p className="text-sm text-gray-500 mt-1.5">
-            Start your journey with SellerCrew
+          <p className="mt-2 text-sm leading-6 text-slate-500">
+            Create your workspace and bring the whole crew into your listing process.
           </p>
         </motion.div>
 
         {/* Form */}
-        <form onSubmit={handleSubmit} className="mt-8 flex flex-col gap-5">
+        <form onSubmit={handleSubmit} className="mt-6 flex flex-col gap-4">
           <motion.div variants={fadeInUp} transition={{ duration: 0.4 }} className="flex flex-col gap-2">
             <Label htmlFor="register-name" className="text-[13px] font-medium text-gray-700">
               Full name
@@ -612,7 +599,7 @@ function RegisterPage() {
                   setName(e.target.value);
                   if (errors.name) setErrors((prev) => ({ ...prev, name: undefined }));
                 }}
-                className={`h-11 pl-10 bg-gray-50/80 border-gray-200 text-[15px] placeholder:text-gray-400 focus-visible:bg-white focus-visible:border-[#035EF9] focus-visible:ring-[#035EF9]/20 ${
+                className={`${authInputClass} ${
                   errors.name ? 'border-red-400 focus-visible:border-red-400 focus-visible:ring-red-400/20' : ''
                 }`}
                 aria-invalid={!!errors.name}
@@ -638,7 +625,7 @@ function RegisterPage() {
                   setEmail(e.target.value);
                   if (errors.email) setErrors((prev) => ({ ...prev, email: undefined }));
                 }}
-                className={`h-11 pl-10 bg-gray-50/80 border-gray-200 text-[15px] placeholder:text-gray-400 focus-visible:bg-white focus-visible:border-[#035EF9] focus-visible:ring-[#035EF9]/20 ${
+                className={`${authInputClass} ${
                   errors.email ? 'border-red-400 focus-visible:border-red-400 focus-visible:ring-red-400/20' : ''
                 }`}
                 aria-invalid={!!errors.email}
@@ -664,7 +651,7 @@ function RegisterPage() {
                   setPassword(e.target.value);
                   if (errors.password) setErrors((prev) => ({ ...prev, password: undefined }));
                 }}
-                className={`h-11 pl-10 pr-10 bg-gray-50/80 border-gray-200 text-[15px] placeholder:text-gray-400 focus-visible:bg-white focus-visible:border-[#035EF9] focus-visible:ring-[#035EF9]/20 ${
+                className={`${authInputClass} pr-11 ${
                   errors.password ? 'border-red-400 focus-visible:border-red-400 focus-visible:ring-red-400/20' : ''
                 }`}
                 aria-invalid={!!errors.password}
@@ -719,7 +706,7 @@ function RegisterPage() {
                   if (errors.confirmPassword)
                     setErrors((prev) => ({ ...prev, confirmPassword: undefined }));
                 }}
-                className={`h-11 pl-10 pr-10 bg-gray-50/80 border-gray-200 text-[15px] placeholder:text-gray-400 focus-visible:bg-white focus-visible:border-[#035EF9] focus-visible:ring-[#035EF9]/20 ${
+                className={`${authInputClass} pr-11 ${
                   errors.confirmPassword
                     ? 'border-red-400 focus-visible:border-red-400 focus-visible:ring-red-400/20'
                     : ''
@@ -756,7 +743,7 @@ function RegisterPage() {
             <Button
               type="submit"
               disabled={isLoading}
-              className="w-full h-11 bg-[#035EF9] hover:bg-[#024fd4] text-white font-semibold text-[15px] rounded-lg shadow-md shadow-[#035EF9]/20 transition-all active:scale-[0.98]"
+              className={authPrimaryClass}
             >
               {isLoading ? (
                 <>
@@ -774,7 +761,7 @@ function RegisterPage() {
         <motion.p
           variants={fadeInUp}
           transition={{ duration: 0.4 }}
-          className="text-center text-sm text-gray-500 mt-8"
+          className="mt-6 text-center text-sm text-gray-500"
         >
           Already have an account?{' '}
           <button
@@ -852,9 +839,9 @@ function ForgotPasswordPage() {
             <motion.div
               variants={fadeInUp}
               transition={{ duration: 0.4 }}
-              className="w-12 h-12 rounded-xl bg-[#035EF9]/10 flex items-center justify-center mb-5"
+              className="mb-5 flex size-12 items-center justify-center rounded-xl bg-gradient-to-br from-[#035EF9]/12 via-[#7E44E6]/12 to-[#F84D8E]/12"
             >
-              <Mail className="h-6 w-6 text-[#035EF9]" />
+              <Mail className="size-6 text-[#7E44E6]" />
             </motion.div>
 
             {/* Header */}
@@ -885,7 +872,7 @@ function ForgotPasswordPage() {
                       setEmail(e.target.value);
                       if (errors.email) setErrors((prev) => ({ ...prev, email: undefined }));
                     }}
-                    className={`h-11 pl-10 bg-gray-50/80 border-gray-200 text-[15px] placeholder:text-gray-400 focus-visible:bg-white focus-visible:border-[#035EF9] focus-visible:ring-[#035EF9]/20 ${
+                    className={`${authInputClass} ${
                       errors.email ? 'border-red-400 focus-visible:border-red-400 focus-visible:ring-red-400/20' : ''
                     }`}
                     aria-invalid={!!errors.email}
@@ -900,7 +887,7 @@ function ForgotPasswordPage() {
                 <Button
                   type="submit"
                   disabled={isLoading}
-                  className="w-full h-11 bg-[#035EF9] hover:bg-[#024fd4] text-white font-semibold text-[15px] rounded-lg shadow-md shadow-[#035EF9]/20 transition-all active:scale-[0.98]"
+                  className={authPrimaryClass}
                 >
                   {isLoading ? (
                     <>
@@ -1031,9 +1018,9 @@ function VerifyEmailPage() {
         <motion.div
           variants={fadeInUp}
           transition={{ duration: 0.4 }}
-          className="w-12 h-12 rounded-xl bg-[#035EF9]/10 flex items-center justify-center mb-5"
+          className="mb-5 flex size-12 items-center justify-center rounded-xl bg-gradient-to-br from-[#035EF9]/12 via-[#7E44E6]/12 to-[#F84D8E]/12"
         >
-          <ShieldCheck className="h-6 w-6 text-[#035EF9]" />
+          <ShieldCheck className="size-6 text-[#7E44E6]" />
         </motion.div>
 
         {/* Header */}
@@ -1110,7 +1097,7 @@ function VerifyEmailPage() {
             type="button"
             onClick={handleVerify}
             disabled={isLoading || otp.length < 6}
-            className="w-full h-11 bg-[#035EF9] hover:bg-[#024fd4] text-white font-semibold text-[15px] rounded-lg shadow-md shadow-[#035EF9]/20 transition-all active:scale-[0.98] disabled:opacity-60"
+            className={`${authPrimaryClass} disabled:opacity-60`}
           >
             {isLoading ? (
               <>
