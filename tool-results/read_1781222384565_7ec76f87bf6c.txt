@@ -1,0 +1,903 @@
+     1→"use client";
+     2→
+     3→import { motion } from "framer-motion";
+     4→import { useAppStore } from "@/lib/store";
+     5→import { agents } from "@/lib/agents";
+     6→import { Button } from "@/components/ui/button";
+     7→import {
+     8→  Accordion,
+     9→  AccordionItem,
+    10→  AccordionTrigger,
+    11→  AccordionContent,
+    12→} from "@/components/ui/accordion";
+    13→import {
+    14→  ArrowRight,
+    15→  Zap,
+    16→  Search,
+    17→  Shield,
+    18→  BarChart3,
+    19→  Image,
+    20→  TrendingUp,
+    21→  ChevronDown,
+    22→  Check,
+    23→  Star,
+    24→  Upload,
+    25→  Users,
+    26→  ArrowRightLeft,
+    27→  Download,
+    28→  Play,
+    29→} from "lucide-react";
+    30→import { useState } from "react";
+    31→
+    32→function HeroSection() {
+    33→  const setView = useAppStore((s) => s.setView);
+    34→
+    35→  return (
+    36→    <section className="relative min-h-screen flex items-center justify-center overflow-hidden bg-[#0B0F1A]">
+    37→      {/* Background gradient */}
+    38→      <div className="absolute inset-0">
+    39→        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl" />
+    40→        <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-purple-500/10 rounded-full blur-3xl" />
+    41→        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-orange-500/5 rounded-full blur-3xl" />
+    42→      </div>
+    43→
+    44→      {/* Grid pattern */}
+    45→      <div
+    46→        className="absolute inset-0 opacity-[0.03]"
+    47→        style={{
+    48→          backgroundImage:
+    49→            "linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px)",
+    50→          backgroundSize: "60px 60px",
+    51→        }}
+    52→      />
+    53→
+    54→      <div className="relative z-10 max-w-5xl mx-auto px-6 text-center">
+    55→        <motion.div
+    56→          initial={{ opacity: 0, y: 30 }}
+    57→          animate={{ opacity: 1, y: 0 }}
+    58→          transition={{ duration: 0.8 }}
+    59→        >
+    60→          {/* Badge */}
+    61→          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/5 border border-white/10 mb-8">
+    62→            <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
+    63→            <span className="text-sm text-white/70">AI-Powered Amazon Listing Platform</span>
+    64→          </div>
+    65→
+    66→          {/* Headline */}
+    67→          <h1 className="text-5xl md:text-7xl font-bold text-white mb-6 leading-tight tracking-tight">
+    68→            Your AI Product
+    69→            <br />
+    70→            <span className="gradient-text">Listing Team</span>
+    71→          </h1>
+    72→
+    73→          {/* Subtitle */}
+    74→          <p className="text-lg md:text-xl text-white/60 max-w-2xl mx-auto mb-10 leading-relaxed">
+    75→            Instead of a single generic AI, work with a complete virtual product listing team.
+    76→            Every agent owns a specific responsibility — from research to compliance.
+    77→          </p>
+    78→
+    79→          {/* CTAs */}
+    80→          <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+    81→            <Button
+    82→              size="lg"
+    83→              className="bg-white text-[#0B0F1A] hover:bg-white/90 px-8 h-12 text-base font-semibold rounded-lg"
+    84→              onClick={() => setView("dashboard")}
+    85→            >
+    86→              Start Free Trial
+    87→              <ArrowRight className="ml-2 h-4 w-4" />
+    88→            </Button>
+    89→            <Button
+    90→              size="lg"
+    91→              variant="outline"
+    92→              className="border-white/20 text-white hover:bg-white/5 px-8 h-12 text-base rounded-lg"
+    93→            >
+    94→              Watch Demo
+    95→            </Button>
+    96→          </div>
+    97→        </motion.div>
+    98→
+    99→        {/* Floating agent avatars */}
+   100→        <motion.div
+   101→          initial={{ opacity: 0, y: 50 }}
+   102→          animate={{ opacity: 1, y: 0 }}
+   103→          transition={{ duration: 0.8, delay: 0.3 }}
+   104→          className="mt-16 flex items-center justify-center gap-2 flex-wrap"
+   105→        >
+   106→          {agents.map((agent, i) => (
+   107→            <motion.div
+   108→              key={agent.id}
+   109→              initial={{ opacity: 0, scale: 0 }}
+   110→              animate={{ opacity: 1, scale: 1 }}
+   111→              transition={{ delay: 0.5 + i * 0.05 }}
+   112→              className="relative group"
+   113→            >
+   114→              <div
+   115→                className="w-12 h-12 rounded-xl overflow-hidden border-2 transition-transform hover:scale-110 hover:-translate-y-1"
+   116→                style={{ borderColor: agent.color + "80" }}
+   117→              >
+   118→                <img
+   119→                  src={agent.avatar}
+   120→                  alt={agent.name}
+   121→                  className="w-full h-full object-cover"
+   122→                />
+   123→              </div>
+   124→              <div className="absolute -bottom-8 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
+   125→                <span className="text-xs text-white/80 bg-black/80 px-2 py-1 rounded">
+   126→                  {agent.name}
+   127→                </span>
+   128→              </div>
+   129→            </motion.div>
+   130→          ))}
+   131→        </motion.div>
+   132→      </div>
+   133→
+   134→      {/* Scroll indicator */}
+   135→      <motion.div
+   136→        animate={{ y: [0, 8, 0] }}
+   137→        transition={{ repeat: Infinity, duration: 2 }}
+   138→        className="absolute bottom-8 left-1/2 -translate-x-1/2"
+   139→      >
+   140→        <ChevronDown className="h-6 w-6 text-white/30" />
+   141→      </motion.div>
+   142→    </section>
+   143→  );
+   144→}
+   145→
+   146→function AgentCard({ agent }: { agent: typeof agents[0] }) {
+   147→  return (
+   148→    <div className="group cursor-pointer rounded-2xl bg-white p-4 text-center transition-all duration-300 hover:-translate-y-1 hover:shadow-lg">
+   149→      <div
+   150→        className="mx-auto w-16 h-16 sm:w-[72px] sm:h-[72px] rounded-2xl overflow-hidden transition-transform duration-300 group-hover:scale-105"
+   151→        style={{ backgroundColor: agent.color }}
+   152→      >
+   153→        <img
+   154→          src={agent.avatar}
+   155→          alt={agent.name}
+   156→          className="w-full h-full object-cover"
+   157→        />
+   158→      </div>
+   159→      <h3 className="font-bold text-[#0B0F1A] text-sm sm:text-base mt-3">{agent.name}</h3>
+   160→      <p className="text-[11px] sm:text-xs text-gray-500 mt-0.5 leading-snug">{agent.role}</p>
+   161→    </div>
+   162→  );
+   163→}
+   164→
+   165→function AgentShowcase() {
+   166→  const ali = agents[0];
+   167→  const team = agents.slice(1);
+   168→
+   169→  return (
+   170→    <section className="py-16 sm:py-24 bg-white">
+   171→      <div className="max-w-5xl mx-auto px-4 sm:px-6">
+   172→        <motion.div
+   173→          initial={{ opacity: 0, y: 20 }}
+   174→          whileInView={{ opacity: 1, y: 0 }}
+   175→          viewport={{ once: true }}
+   176→          className="text-center mb-10 sm:mb-14"
+   177→        >
+   178→          <h2 className="text-3xl sm:text-4xl font-bold text-[#0B0F1A] mb-4">
+   179→            Meet The Crew
+   180→          </h2>
+   181→          <p className="text-base sm:text-lg text-gray-500 max-w-2xl mx-auto">
+   182→            11 specialized agents, each an expert in their domain, working together to create
+   183→            perfect Amazon listings.
+   184→          </p>
+   185→        </motion.div>
+   186→
+   187→        <div className="flex flex-col items-center gap-8 sm:gap-10">
+   188→          {/* Ali - Chief Commander, no border/card */}
+   189→          <motion.div
+   190→            initial={{ opacity: 0, y: 20 }}
+   191→            whileInView={{ opacity: 1, y: 0 }}
+   192→            viewport={{ once: true }}
+   193→            transition={{ delay: 0 }}
+   194→            className="text-center"
+   195→          >
+   196→            <div
+   197→              className="mx-auto w-20 h-20 sm:w-24 sm:h-24 rounded-2xl overflow-hidden"
+   198→              style={{ backgroundColor: ali.color }}
+   199→            >
+   200→              <img
+   201→                src={ali.avatar}
+   202→                alt={ali.name}
+   203→                className="w-full h-full object-cover"
+   204→              />
+   205→            </div>
+   206→            <h3 className="font-bold text-[#0B0F1A] text-lg sm:text-xl mt-4">{ali.name}</h3>
+   207→            <p className="text-sm text-gray-500 mt-1">{ali.role}</p>
+   208→            <div className="mt-3 inline-flex items-center gap-1.5 px-3 py-1 bg-[#0B0F1A] rounded-full">
+   209→              <span className="text-xs text-white font-semibold">Team Leader</span>
+   210→            </div>
+   211→          </motion.div>
+   212→
+   213→          {/* Team: 2 per row mobile, 5 per row desktop */}
+   214→          <motion.div
+   215→            initial={{ opacity: 0, y: 20 }}
+   216→            whileInView={{ opacity: 1, y: 0 }}
+   217→            viewport={{ once: true }}
+   218→            transition={{ delay: 0.15 }}
+   219→            className="grid grid-cols-2 lg:grid-cols-5 gap-4 sm:gap-5 w-full"
+   220→          >
+   221→            {team.map((agent) => (
+   222→              <AgentCard key={agent.id} agent={agent} />
+   223→            ))}
+   224→          </motion.div>
+   225→        </div>
+   226→      </div>
+   227→    </section>
+   228→  );
+   229→}
+   230→
+   231→const features = [
+   232→  {
+   233→    icon: Zap,
+   234→    title: "AI Listing Creation",
+   235→    description: "Generate complete Amazon listings with titles, bullets, descriptions, and A+ content in minutes.",
+   236→    color: "#035EF9",
+   237→  },
+   238→  {
+   239→    icon: Search,
+   240→    title: "Keyword Research",
+   241→    description: "Discover high-converting keywords with search volume analysis and competitor keyword mapping.",
+   242→    color: "#36B46F",
+   243→  },
+   244→  {
+   245→    icon: Shield,
+   246→    title: "Compliance Validation",
+   247→    description: "Ensure every listing meets Amazon's policies with automated compliance checking and risk detection.",
+   248→    color: "#E82E33",
+   249→  },
+   250→  {
+   251→    icon: BarChart3,
+   252→    title: "Competitor Analysis",
+   253→    description: "Analyze competitor listings, pricing strategies, and market positioning to gain competitive advantage.",
+   254→    color: "#7E44E6",
+   255→  },
+   256→  {
+   257→    icon: Image,
+   258→    title: "Image Brief Generation",
+   259→    description: "Create detailed image briefs for lifestyle shots, infographics, hero images, and packaging designs.",
+   260→    color: "#FC7403",
+   261→  },
+   262→  {
+   263→    icon: TrendingUp,
+   264→    title: "SEO Optimization",
+   265→    description: "Optimize listings for Amazon's A9 algorithm with keyword placement and search intent mapping.",
+   266→    color: "#3EC9D1",
+   267→  },
+   268→];
+   269→
+   270→function FeaturesSection() {
+   271→  return (
+   272→    <section className="py-24 bg-gray-50/50">
+   273→      <div className="max-w-7xl mx-auto px-6">
+   274→        <motion.div
+   275→          initial={{ opacity: 0, y: 20 }}
+   276→          whileInView={{ opacity: 1, y: 0 }}
+   277→          viewport={{ once: true }}
+   278→          className="text-center mb-16"
+   279→        >
+   280→          <h2 className="text-3xl md:text-4xl font-bold text-[#0B0F1A] mb-4">
+   281→            Everything You Need
+   282→          </h2>
+   283→          <p className="text-lg text-gray-500 max-w-2xl mx-auto">
+   284→            A complete toolkit for Amazon sellers, powered by specialized AI agents.
+   285→          </p>
+   286→        </motion.div>
+   287→
+   288→        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+   289→          {features.map((feature, i) => (
+   290→            <motion.div
+   291→              key={feature.title}
+   292→              initial={{ opacity: 0, y: 20 }}
+   293→              whileInView={{ opacity: 1, y: 0 }}
+   294→              viewport={{ once: true }}
+   295→              transition={{ delay: i * 0.1 }}
+   296→              className="bg-white rounded-xl border border-gray-100 p-6 hover:shadow-lg transition-shadow"
+   297→            >
+   298→              <div
+   299→                className="w-12 h-12 rounded-lg flex items-center justify-center mb-4"
+   300→                style={{ backgroundColor: feature.color + "15" }}
+   301→              >
+   302→                <feature.icon className="h-6 w-6" style={{ color: feature.color }} />
+   303→              </div>
+   304→              <h3 className="font-semibold text-[#0B0F1A] text-lg mb-2">{feature.title}</h3>
+   305→              <p className="text-gray-500 text-sm leading-relaxed">{feature.description}</p>
+   306→            </motion.div>
+   307→          ))}
+   308→        </div>
+   309→      </div>
+   310→    </section>
+   311→  );
+   312→}
+   313→
+   314→const workflowSteps = [
+   315→  { step: "01", title: "Upload Product", description: "Enter your product details, images, and any existing listing information." },
+   316→  { step: "02", title: "AI Team Analysis", description: "Our 11 specialized agents analyze your product, market, and competitors." },
+   317→  { step: "03", title: "Review Results", description: "Review generated content, keyword strategies, and compliance reports." },
+   318→  { step: "04", title: "Export Listing", description: "Export your Amazon-ready listing in multiple formats." },
+   319→];
+   320→
+   321→function WorkflowSection() {
+   322→  return (
+   323→    <section className="py-24 bg-white">
+   324→      <div className="max-w-5xl mx-auto px-6">
+   325→        <motion.div
+   326→          initial={{ opacity: 0, y: 20 }}
+   327→          whileInView={{ opacity: 1, y: 0 }}
+   328→          viewport={{ once: true }}
+   329→          className="text-center mb-16"
+   330→        >
+   331→          <h2 className="text-3xl md:text-4xl font-bold text-[#0B0F1A] mb-4">
+   332→            How It Works
+   333→          </h2>
+   334→          <p className="text-lg text-gray-500">
+   335→            From product details to Amazon-ready listing in four simple steps.
+   336→          </p>
+   337→        </motion.div>
+   338→
+   339→        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
+   340→          {workflowSteps.map((step, i) => (
+   341→            <motion.div
+   342→              key={step.step}
+   343→              initial={{ opacity: 0, y: 20 }}
+   344→              whileInView={{ opacity: 1, y: 0 }}
+   345→              viewport={{ once: true }}
+   346→              transition={{ delay: i * 0.15 }}
+   347→              className="relative text-center"
+   348→            >
+   349→              <div className="text-5xl font-bold text-gray-100 mb-4">{step.step}</div>
+   350→              <h3 className="font-semibold text-[#0B0F1A] text-lg mb-2">{step.title}</h3>
+   351→              <p className="text-gray-500 text-sm">{step.description}</p>
+   352→              {i < 3 && (
+   353→                <ArrowRight className="hidden lg:block absolute top-8 -right-4 h-5 w-5 text-gray-300" />
+   354→              )}
+   355→            </motion.div>
+   356→          ))}
+   357→        </div>
+   358→      </div>
+   359→    </section>
+   360→  );
+   361→}
+   362→
+   363→const pricingPlans = [
+   364→  {
+   365→    name: "Starter",
+   366→    price: "$29",
+   367→    period: "/month",
+   368→    description: "10 Listings, 500 Credits, 1 User",
+   369→    features: ["10 Listings/month", "500 Credits", "1 User Seat", "Keyword Research", "Basic Compliance", "Email Support"],
+   370→    cta: "Get Started",
+   371→    popular: false,
+   372→  },
+   373→  {
+   374→    name: "Pro",
+   375→    price: "$79",
+   376→    period: "/month",
+   377→    description: "100 Listings, 5,000 Credits, 5 Users",
+   378→    features: [
+   379→      "100 Listings/month",
+   380→      "5,000 Credits",
+   381→      "5 User Seats",
+   382→      "Advanced Keyword Research",
+   383→      "Full Compliance Suite",
+   384→      "Competitor Analysis",
+   385→      "Image Briefs",
+   386→      "Priority Support",
+   387→    ],
+   388→    cta: "Start Free Trial",
+   389→    popular: true,
+   390→  },
+   391→  {
+   392→    name: "Agency",
+   393→    price: "$199",
+   394→    period: "/month",
+   395→    description: "500 Listings, 25,000 Credits, 20 Users",
+   396→    features: [
+   397→      "500 Listings/month",
+   398→      "25,000 Credits",
+   399→      "20 User Seats",
+   400→      "All Research Tools",
+   401→      "Full Compliance Suite",
+   402→      "Competitor Intelligence",
+   403→      "Image Briefs",
+   404→      "API Access",
+   405→      "Dedicated Support",
+   406→    ],
+   407→    cta: "Contact Sales",
+   408→    popular: false,
+   409→  },
+   410→  {
+   411→    name: "Enterprise",
+   412→    price: "Custom",
+   413→    period: "",
+   414→    description: "Unlimited Everything",
+   415→    features: [
+   416→      "Unlimited Listings",
+   417→      "Unlimited Credits",
+   418→      "Unlimited Users",
+   419→      "Custom Agent Training",
+   420→      "Multi-Marketplace",
+   421→      "SLA Guarantee",
+   422→      "Custom Integrations",
+   423→      "On-premise Option",
+   424→    ],
+   425→    cta: "Talk to Us",
+   426→    popular: false,
+   427→  },
+   428→];
+   429→
+   430→function PricingSection() {
+   431→  const setView = useAppStore((s) => s.setView);
+   432→
+   433→  return (
+   434→    <section className="py-24 bg-gray-50/50">
+   435→      <div className="max-w-7xl mx-auto px-6">
+   436→        <motion.div
+   437→          initial={{ opacity: 0, y: 20 }}
+   438→          whileInView={{ opacity: 1, y: 0 }}
+   439→          viewport={{ once: true }}
+   440→          className="text-center mb-16"
+   441→        >
+   442→          <h2 className="text-3xl md:text-4xl font-bold text-[#0B0F1A] mb-4">
+   443→            Simple, Transparent Pricing
+   444→          </h2>
+   445→          <p className="text-lg text-gray-500">
+   446→            Choose the plan that fits your selling volume.
+   447→          </p>
+   448→        </motion.div>
+   449→
+   450→        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
+   451→          {pricingPlans.map((plan, i) => (
+   452→            <motion.div
+   453→              key={plan.name}
+   454→              initial={{ opacity: 0, y: 20 }}
+   455→              whileInView={{ opacity: 1, y: 0 }}
+   456→              viewport={{ once: true }}
+   457→              transition={{ delay: i * 0.1 }}
+   458→              className={`relative rounded-xl border p-6 ${
+   459→                plan.popular
+   460→                  ? "border-[#035EF9] bg-white shadow-lg"
+   461→                  : "border-gray-200 bg-white"
+   462→              }`}
+   463→            >
+   464→              {plan.popular && (
+   465→                <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+   466→                  <span className="bg-[#035EF9] text-white text-xs font-medium px-3 py-1 rounded-full">
+   467→                    Most Popular
+   468→                  </span>
+   469→                </div>
+   470→              )}
+   471→              <h3 className="font-semibold text-[#0B0F1A] text-lg">{plan.name}</h3>
+   472→              <div className="mt-4 mb-2">
+   473→                <span className="text-4xl font-bold text-[#0B0F1A]">{plan.price}</span>
+   474→                <span className="text-gray-500">{plan.period}</span>
+   475→              </div>
+   476→              <p className="text-sm text-gray-500 mb-6">{plan.description}</p>
+   477→              <ul className="space-y-3 mb-8">
+   478→                {plan.features.map((feature) => (
+   479→                  <li key={feature} className="flex items-center gap-2 text-sm text-gray-600">
+   480→                    <Check className="h-4 w-4 text-green-500 shrink-0" />
+   481→                    {feature}
+   482→                  </li>
+   483→                ))}
+   484→              </ul>
+   485→              <Button
+   486→                className={`w-full ${
+   487→                  plan.popular
+   488→                    ? "bg-[#035EF9] hover:bg-[#035EF9]/90 text-white"
+   489→                    : "bg-[#0B0F1A] hover:bg-[#0B0F1A]/90 text-white"
+   490→                }`}
+   491→                onClick={() => setView("dashboard")}
+   492→              >
+   493→                {plan.cta}
+   494→              </Button>
+   495→            </motion.div>
+   496→          ))}
+   497→        </div>
+   498→      </div>
+   499→    </section>
+   500→  );
+   501→}
+   502→
+   503→/* ──────────────────────────────────────────────
+   504→   NEW SECTION: HowItWorks
+   505→   ────────────────────────────────────────────── */
+   506→
+   507→const howItWorksSteps = [
+   508→  {
+   509→    number: 1,
+   510→    icon: Upload,
+   511→    title: "Upload Product",
+   512→    description: "Enter your product details and our AI team gets to work immediately.",
+   513→    color: "#035EF9",
+   514→  },
+   515→  {
+   516→    number: 2,
+   517→    icon: Users,
+   518→    title: "AI Team Analysis",
+   519→    description: "11 specialized agents analyze every aspect of your product and market.",
+   520→    color: "#36B46F",
+   521→  },
+   522→  {
+   523→    number: 3,
+   524→    icon: ArrowRightLeft,
+   525→    title: "Agent Pipeline",
+   526→    description: "Each agent contributes their expertise in sequence, building on previous insights.",
+   527→    color: "#FC7403",
+   528→  },
+   529→  {
+   530→    number: 4,
+   531→    icon: Download,
+   532→    title: "Export Listing",
+   533→    description: "Get a complete, optimized Amazon listing ready to publish.",
+   534→    color: "#7E44E6",
+   535→  },
+   536→];
+   537→
+   538→function HowItWorksSection() {
+   539→  return (
+   540→    <section className="py-24 bg-white">
+   541→      <div className="max-w-6xl mx-auto px-6">
+   542→        <motion.div
+   543→          initial={{ opacity: 0, y: 20 }}
+   544→          whileInView={{ opacity: 1, y: 0 }}
+   545→          viewport={{ once: true }}
+   546→          className="text-center mb-16"
+   547→        >
+   548→          <h2 className="text-3xl md:text-4xl font-bold text-[#0B0F1A] mb-4">
+   549→            How It Works
+   550→          </h2>
+   551→          <p className="text-lg text-gray-500 max-w-2xl mx-auto">
+   552→            From product details to Amazon-ready listing in four simple steps.
+   553→          </p>
+   554→        </motion.div>
+   555→
+   556→        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 lg:gap-4">
+   557→          {howItWorksSteps.map((step, i) => (
+   558→            <motion.div
+   559→              key={step.number}
+   560→              initial={{ opacity: 0, y: 30 }}
+   561→              whileInView={{ opacity: 1, y: 0 }}
+   562→              viewport={{ once: true }}
+   563→              transition={{ delay: i * 0.15, duration: 0.5 }}
+   564→              className="relative"
+   565→            >
+   566→              <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 text-center hover:shadow-lg transition-shadow h-full">
+   567→                {/* Step number circle */}
+   568→                <div className="flex items-center justify-center mb-5">
+   569→                  <div
+   570→                    className="w-14 h-14 rounded-full flex items-center justify-center text-white font-bold text-xl shadow-md"
+   571→                    style={{ backgroundColor: step.color }}
+   572→                  >
+   573→                    {step.number}
+   574→                  </div>
+   575→                </div>
+   576→
+   577→                {/* Icon */}
+   578→                <div
+   579→                  className="w-10 h-10 rounded-lg flex items-center justify-center mx-auto mb-4"
+   580→                  style={{ backgroundColor: step.color + "15" }}
+   581→                >
+   582→                  <step.icon className="h-5 w-5" style={{ color: step.color }} />
+   583→                </div>
+   584→
+   585→                {/* Title & Description */}
+   586→                <h3 className="font-semibold text-[#0B0F1A] text-lg mb-2">{step.title}</h3>
+   587→                <p className="text-gray-500 text-sm leading-relaxed">{step.description}</p>
+   588→              </div>
+   589→
+   590→              {/* Connecting arrow between cards (desktop only) */}
+   591→              {i < 3 && (
+   592→                <div className="hidden lg:flex absolute top-1/2 -right-2 transform -translate-y-1/2 z-10">
+   593→                  <ArrowRight className="h-5 w-5 text-gray-300" />
+   594→                </div>
+   595→              )}
+   596→            </motion.div>
+   597→          ))}
+   598→        </div>
+   599→      </div>
+   600→    </section>
+   601→  );
+   602→}
+   603→
+   604→/* ──────────────────────────────────────────────
+   605→   NEW SECTION: FAQ
+   606→   ────────────────────────────────────────────── */
+   607→
+   608→const faqItems = [
+   609→  {
+   610→    question: "What makes SellerCrew different from other AI listing tools?",
+   611→    answer:
+   612→      "Unlike generic AI tools that give you one-size-fits-all output, SellerCrew uses 11 specialized AI agents, each an expert in their domain. From product research to compliance checking, every aspect of your listing is handled by a dedicated specialist.",
+   613→  },
+   614→  {
+   615→    question: "How does the credit system work?",
+   616→    answer:
+   617→      "Each AI agent has a specific credit cost. A full listing generation uses 95 credits total. Your plan determines how many credits you receive monthly. Unused credits do not roll over.",
+   618→  },
+   619→  {
+   620→    question: "Can I use SellerCrew for multiple marketplaces?",
+   621→    answer:
+   622→      "Yes! SellerCrew supports Amazon US, UK, DE, and more. Each project can target a specific marketplace and country, with agents adapting their output accordingly.",
+   623→  },
+   624→  {
+   625→    question: "How accurate is the compliance checking?",
+   626→    answer:
+   627→      "Our compliance agent Saleem validates listings against the latest Amazon policies with 98%+ accuracy. Regular updates ensure alignment with policy changes.",
+   628→  },
+   629→  {
+   630→    question: "Can I customize the AI agents?",
+   631→    answer:
+   632→      "Enterprise plan users can request custom agent training and specialized workflows tailored to their brand voice and product categories.",
+   633→  },
+   634→  {
+   635→    question: "Is my data secure?",
+   636→    answer:
+   637→      "Absolutely. We use enterprise-grade encryption, and your data is never used to train our models. Each organization's data is completely isolated.",
+   638→  },
+   639→];
+   640→
+   641→function FAQSection() {
+   642→  return (
+   643→    <section className="py-24 bg-white">
+   644→      <div className="max-w-3xl mx-auto px-6">
+   645→        <motion.div
+   646→          initial={{ opacity: 0, y: 20 }}
+   647→          whileInView={{ opacity: 1, y: 0 }}
+   648→          viewport={{ once: true }}
+   649→          className="text-center mb-14"
+   650→        >
+   651→          <h2 className="text-3xl md:text-4xl font-bold text-[#0B0F1A] mb-4">
+   652→            Frequently Asked Questions
+   653→          </h2>
+   654→          <p className="text-lg text-gray-500">
+   655→            Everything you need to know about SellerCrew.
+   656→          </p>
+   657→        </motion.div>
+   658→
+   659→        <motion.div
+   660→          initial={{ opacity: 0, y: 20 }}
+   661→          whileInView={{ opacity: 1, y: 0 }}
+   662→          viewport={{ once: true }}
+   663→          transition={{ delay: 0.1 }}
+   664→        >
+   665→          <Accordion type="single" collapsible className="w-full">
+   666→            {faqItems.map((item, i) => (
+   667→              <AccordionItem
+   668→                key={i}
+   669→                value={`faq-${i}`}
+   670→                className="border-gray-200"
+   671→              >
+   672→                <AccordionTrigger className="text-left text-base font-medium text-[#0B0F1A] hover:no-underline hover:text-[#0B0F1A]/80 py-5">
+   673→                  {item.question}
+   674→                </AccordionTrigger>
+   675→                <AccordionContent className="text-gray-500 leading-relaxed text-sm">
+   676→                  {item.answer}
+   677→                </AccordionContent>
+   678→              </AccordionItem>
+   679→            ))}
+   680→          </Accordion>
+   681→        </motion.div>
+   682→      </div>
+   683→    </section>
+   684→  );
+   685→}
+   686→
+   687→/* ──────────────────────────────────────────────
+   688→   NEW SECTION: CTA
+   689→   ────────────────────────────────────────────── */
+   690→
+   691→function CTASection() {
+   692→  const setView = useAppStore((s) => s.setView);
+   693→
+   694→  return (
+   695→    <section className="relative py-24 overflow-hidden bg-[#0B0F1A]">
+   696→      {/* Background gradient accents */}
+   697→      <div className="absolute inset-0">
+   698→        <div className="absolute top-0 left-1/3 w-80 h-80 bg-blue-500/10 rounded-full blur-3xl" />
+   699→        <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-purple-500/10 rounded-full blur-3xl" />
+   700→        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-orange-500/5 rounded-full blur-3xl" />
+   701→      </div>
+   702→
+   703→      {/* Floating agent avatars (decorative) */}
+   704→      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+   705→        {agents.slice(0, 6).map((agent, i) => {
+   706→          const positions = [
+   707→            { top: "10%", left: "8%" },
+   708→            { top: "20%", right: "12%" },
+   709→            { bottom: "15%", left: "15%" },
+   710→            { bottom: "25%", right: "8%" },
+   711→            { top: "40%", left: "5%" },
+   712→            { top: "35%", right: "5%" },
+   713→          ];
+   714→          const pos = positions[i];
+   715→          const style: React.CSSProperties = {
+   716→            position: "absolute",
+   717→            opacity: 0.15,
+   718→            ...pos,
+   719→          };
+   720→          return (
+   721→            <motion.div
+   722→              key={agent.id}
+   723→              style={style}
+   724→              animate={{ y: [0, -10, 0] }}
+   725→              transition={{ repeat: Infinity, duration: 3 + i * 0.5, ease: "easeInOut" }}
+   726→            >
+   727→              <div
+   728→                className="w-14 h-14 rounded-xl overflow-hidden"
+   729→                style={{ backgroundColor: agent.color }}
+   730→              >
+   731→                <img
+   732→                  src={agent.avatar}
+   733→                  alt={agent.name}
+   734→                  className="w-full h-full object-cover"
+   735→                />
+   736→              </div>
+   737→            </motion.div>
+   738→          );
+   739→        })}
+   740→      </div>
+   741→
+   742→      <div className="relative z-10 max-w-3xl mx-auto px-6 text-center">
+   743→        <motion.div
+   744→          initial={{ opacity: 0, y: 30 }}
+   745→          whileInView={{ opacity: 1, y: 0 }}
+   746→          viewport={{ once: true }}
+   747→          transition={{ duration: 0.6 }}
+   748→        >
+   749→          <h2 className="text-3xl md:text-5xl font-bold text-white mb-6 leading-tight">
+   750→            Ready to Transform Your
+   751→            <br />
+   752→            Amazon Listings?
+   753→          </h2>
+   754→          <p className="text-lg text-white/60 max-w-xl mx-auto mb-10 leading-relaxed">
+   755→            Join thousands of sellers who use SellerCrew&apos;s AI team to create better listings, faster.
+   756→          </p>
+   757→
+   758→          <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+   759→            <Button
+   760→              size="lg"
+   761→              className="bg-white text-[#0B0F1A] hover:bg-white/90 px-8 h-12 text-base font-semibold rounded-lg"
+   762→              onClick={() => setView("dashboard")}
+   763→            >
+   764→              Start Free Trial
+   765→              <ArrowRight className="ml-2 h-4 w-4" />
+   766→            </Button>
+   767→            <Button
+   768→              size="lg"
+   769→              variant="outline"
+   770→              className="border-white/20 text-white hover:bg-white/5 px-8 h-12 text-base rounded-lg"
+   771→            >
+   772→              <Play className="mr-2 h-4 w-4" />
+   773→              Watch Demo
+   774→            </Button>
+   775→          </div>
+   776→        </motion.div>
+   777→      </div>
+   778→    </section>
+   779→  );
+   780→}
+   781→
+   782→function Footer() {
+   783→  return (
+   784→    <footer className="bg-[#0B0F1A] text-white/60 py-16">
+   785→      <div className="max-w-7xl mx-auto px-6">
+   786→        <div className="grid md:grid-cols-4 gap-12 mb-12">
+   787→          <div>
+   788→            <div className="flex items-center gap-2 mb-4">
+   789→              <div className="w-8 h-8 rounded-lg overflow-hidden">
+   790→                <img src="/logo2.png" alt="SellerCrew" className="w-full h-full object-cover" />
+   791→              </div>
+   792→              <img src="/logo-text.png" alt="SellerCrew" className="h-6 object-contain" />
+   793→            </div>
+   794→            <p className="text-sm leading-relaxed">
+   795→              Your AI Product Listing Team. Specialized agents working together to create
+   796→              perfect Amazon listings.
+   797→            </p>
+   798→          </div>
+   799→          <div>
+   800→            <h4 className="text-white font-semibold mb-4">Product</h4>
+   801→            <ul className="space-y-2 text-sm">
+   802→              <li className="hover:text-white cursor-pointer transition-colors">Listing Builder</li>
+   803→              <li className="hover:text-white cursor-pointer transition-colors">Keyword Center</li>
+   804→              <li className="hover:text-white cursor-pointer transition-colors">Competitor Analyzer</li>
+   805→              <li className="hover:text-white cursor-pointer transition-colors">Image Briefs</li>
+   806→            </ul>
+   807→          </div>
+   808→          <div>
+   809→            <h4 className="text-white font-semibold mb-4">Company</h4>
+   810→            <ul className="space-y-2 text-sm">
+   811→              <li className="hover:text-white cursor-pointer transition-colors">About Us</li>
+   812→              <li className="hover:text-white cursor-pointer transition-colors">Blog</li>
+   813→              <li className="hover:text-white cursor-pointer transition-colors">Careers</li>
+   814→              <li className="hover:text-white cursor-pointer transition-colors">Contact</li>
+   815→            </ul>
+   816→          </div>
+   817→          <div>
+   818→            <h4 className="text-white font-semibold mb-4">Legal</h4>
+   819→            <ul className="space-y-2 text-sm">
+   820→              <li className="hover:text-white cursor-pointer transition-colors">Privacy Policy</li>
+   821→              <li className="hover:text-white cursor-pointer transition-colors">Terms of Service</li>
+   822→              <li className="hover:text-white cursor-pointer transition-colors">Cookie Policy</li>
+   823→            </ul>
+   824→          </div>
+   825→        </div>
+   826→        <div className="border-t border-white/10 pt-8 text-center text-sm">
+   827→          &copy; {new Date().getFullYear()} SellerCrew. All rights reserved.
+   828→        </div>
+   829→      </div>
+   830→    </footer>
+   831→  );
+   832→}
+   833→
+   834→function Navbar() {
+   835→  const setView = useAppStore((s) => s.setView);
+   836→  const [scrolled, setScrolled] = useState(false);
+   837→
+   838→  useState(() => {
+   839→    if (typeof window !== "undefined") {
+   840→      const handleScroll = () => setScrolled(window.scrollY > 50);
+   841→      window.addEventListener("scroll", handleScroll);
+   842→      return () => window.removeEventListener("scroll", handleScroll);
+   843→    }
+   844→  });
+   845→
+   846→  return (
+   847→    <nav
+   848→      className={`fixed top-0 left-0 right-0 z-50 transition-all ${
+   849→        scrolled ? "bg-[#0B0F1A]/95 backdrop-blur-md border-b border-white/10" : "bg-transparent"
+   850→      }`}
+   851→    >
+   852→      <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
+   853→        <div className="flex items-center gap-2">
+   854→          <div className="w-8 h-8 rounded-lg overflow-hidden">
+   855→            <img src="/logo2.png" alt="SellerCrew" className="w-full h-full object-cover" />
+   856→          </div>
+   857→          <img src="/logo-text.png" alt="SellerCrew" className="h-6 object-contain" />
+   858→        </div>
+   859→        <div className="hidden md:flex items-center gap-8">
+   860→          <a href="#features" className="text-sm text-white/70 hover:text-white transition-colors">
+   861→            Features
+   862→          </a>
+   863→          <a href="#agents" className="text-sm text-white/70 hover:text-white transition-colors">
+   864→            AI Team
+   865→          </a>
+   866→          <a href="#pricing" className="text-sm text-white/70 hover:text-white transition-colors">
+   867→            Pricing
+   868→          </a>
+   869→        </div>
+   870→        <Button
+   871→          className="bg-white text-[#0B0F1A] hover:bg-white/90 h-9 px-4 text-sm rounded-lg font-medium"
+   872→          onClick={() => setView("dashboard")}
+   873→        >
+   874→          Get Started
+   875→        </Button>
+   876→      </div>
+   877→    </nav>
+   878→  );
+   879→}
+   880→
+   881→export function LandingPage() {
+   882→  return (
+   883→    <div className="min-h-screen">
+   884→      <Navbar />
+   885→      <HeroSection />
+   886→      <HowItWorksSection />
+   887→      <div id="agents">
+   888→        <AgentShowcase />
+   889→      </div>
+   890→      <div id="features">
+   891→        <FeaturesSection />
+   892→      </div>
+   893→      <WorkflowSection />
+   894→      <div id="pricing">
+   895→        <PricingSection />
+   896→      </div>
+   897→      <FAQSection />
+   898→      <CTASection />
+   899→      <Footer />
+   900→    </div>
+   901→  );
+   902→}
+   903→
