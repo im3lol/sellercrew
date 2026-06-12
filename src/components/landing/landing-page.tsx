@@ -357,13 +357,16 @@ function HeroSection() {
 /* ───────────────────────── Section 2: Dashboard Preview ───────────────────────── */
 
 function DashboardPreviewSection() {
-  const previews = [
-    { title: "Project Dashboard", image: "/previews/dashboard.png" },
-    { title: "Agent Workflow", image: "/previews/workflow.png" },
-    { title: "Listing Generator", image: "/previews/generator.png" },
-  ];
+  const setView = useAppStore((s) => s.setView);
 
-  const pills = ["Research Reports", "SEO Analysis", "Compliance Reports"];
+  const previews = [
+    { title: "Dashboard", desc: "Manage projects and track credits", image: "/previews/real-dashboard-full.png" },
+    { title: "Listing Builder", desc: "Generate AI-powered listings", image: "/previews/real-listing-generated.png" },
+    { title: "AI Agents", desc: "Chat with specialist agents", image: "/previews/real-agents.png" },
+    { title: "Keyword Research", desc: "Discover high-converting keywords", image: "/previews/real-keyword-research.png" },
+    { title: "Projects", desc: "Organize your product listings", image: "/previews/real-projects.png" },
+    { title: "Image Briefs", desc: "Generate visual content briefs", image: "/previews/real-image-analysis.png" },
+  ];
 
   return (
     <section className="py-24 sm:py-32 bg-white">
@@ -375,59 +378,81 @@ function DashboardPreviewSection() {
           viewport={{ once: true }}
           className="text-center mb-16"
         >
+          <Badge variant="secondary" className="mb-4 px-3 py-1 text-xs rounded-full bg-blue-50 text-[#035EF9] border border-blue-100">
+            Live Product Preview
+          </Badge>
           <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold text-[#0B0F1A] tracking-tight mb-4">
-            See SellerCrew in Action
+            The Real Thing. Not Mockups.
           </h2>
           <p className="text-lg text-gray-500 max-w-2xl mx-auto">
-            A complete workspace designed for Amazon listing professionals.
+            Actual screenshots from SellerCrew. No stock photos, no AI-generated mockups.
           </p>
         </motion.div>
 
+        {/* Hero screenshot - large */}
+        <motion.div
+          variants={fadeUp}
+          initial="hidden"
+          whileInView="visible"
+          viewport={{ once: true }}
+          className="mb-8"
+        >
+          <div className="relative rounded-2xl border border-gray-200/80 shadow-xl overflow-hidden bg-gray-50">
+            <div className="flex items-center gap-1.5 px-4 py-3 bg-gray-100/80 border-b border-gray-200/60">
+              <div className="w-3 h-3 rounded-full bg-red-400/80" />
+              <div className="w-3 h-3 rounded-full bg-yellow-400/80" />
+              <div className="w-3 h-3 rounded-full bg-green-400/80" />
+              <span className="ml-3 text-xs text-gray-400 font-mono">sellercrew.app/dashboard</span>
+            </div>
+            <Image
+              src="/previews/real-dashboard-full.png"
+              alt="SellerCrew Dashboard"
+              width={1400}
+              height={800}
+              className="w-full h-auto"
+            />
+          </div>
+        </motion.div>
+
+        {/* Grid of 6 smaller screenshots */}
         <motion.div
           variants={staggerContainer}
           initial="hidden"
           whileInView="visible"
           viewport={{ once: true }}
-          className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10"
+          className="grid grid-cols-2 md:grid-cols-3 gap-4"
         >
           {previews.map((preview) => (
             <motion.div key={preview.title} variants={fadeUp}>
-              <Card className="overflow-hidden border border-gray-200/80 shadow-sm hover:shadow-lg hover:scale-[1.02] transition-all duration-300 py-0 gap-0">
-                <div className="aspect-video bg-gray-100 overflow-hidden">
+              <div className="group rounded-xl border border-gray-200/60 overflow-hidden bg-white hover:shadow-lg hover:border-gray-300/80 transition-all duration-300">
+                <div className="aspect-video bg-gray-50 overflow-hidden">
                   <Image
                     src={preview.image}
                     alt={preview.title}
                     width={600}
                     height={340}
-                    className="w-full h-full object-cover object-top"
+                    className="w-full h-full object-cover object-top group-hover:scale-[1.02] transition-transform duration-500"
                   />
                 </div>
-                <div className="p-4 border-t border-gray-100">
+                <div className="px-3 py-2.5 border-t border-gray-100">
                   <p className="text-sm font-semibold text-[#0B0F1A]">{preview.title}</p>
+                  <p className="text-xs text-gray-400">{preview.desc}</p>
                 </div>
-              </Card>
+              </div>
             </motion.div>
           ))}
         </motion.div>
 
-        <motion.div
-          variants={staggerContainer}
-          initial="hidden"
-          whileInView="visible"
-          viewport={{ once: true }}
-          className="flex flex-wrap items-center justify-center gap-3"
-        >
-          {pills.map((pill) => (
-            <motion.div key={pill} variants={fadeUp}>
-              <Badge
-                variant="secondary"
-                className="px-4 py-2 text-sm rounded-full bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors"
-              >
-                {pill}
-              </Badge>
-            </motion.div>
-          ))}
-        </motion.div>
+        <div className="text-center mt-10">
+          <Button
+            variant="outline"
+            className="rounded-xl px-6 h-11 text-sm border-gray-200 text-[#0B0F1A] hover:bg-gray-50"
+            onClick={() => setView("auth")}
+          >
+            Try It Yourself
+            <ArrowRight className="ml-2 size-4" />
+          </Button>
+        </div>
       </div>
     </section>
   );
@@ -533,18 +558,26 @@ function ProblemSection() {
           <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold text-[#0B0F1A] tracking-tight mb-4">
             The Problem with Generic AI Tools
           </h2>
+          <p className="text-lg text-gray-500 max-w-2xl mx-auto">
+            One AI can&apos;t do everything well. You need specialists.
+          </p>
         </motion.div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-5xl mx-auto">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-5xl mx-auto">
           {/* Without */}
           <motion.div
             variants={staggerContainerSlow}
             initial="hidden"
             whileInView="visible"
             viewport={{ once: true }}
-            className="rounded-2xl border border-red-100 bg-red-50/50 p-8"
+            className="rounded-2xl border border-gray-200 bg-[#0B0F1A] p-8"
           >
-            <h3 className="text-lg font-semibold text-red-700 mb-6">Without SellerCrew</h3>
+            <div className="flex items-center gap-2 mb-6">
+              <div className="w-8 h-8 rounded-lg bg-red-500/10 flex items-center justify-center">
+                <X className="size-4 text-red-400" />
+              </div>
+              <h3 className="text-lg font-semibold text-white/90">Without SellerCrew</h3>
+            </div>
             <div className="space-y-4">
               {withoutItems.map((item) => (
                 <motion.div
@@ -552,10 +585,10 @@ function ProblemSection() {
                   variants={fadeUp}
                   className="flex items-start gap-3"
                 >
-                  <div className="mt-0.5 shrink-0 w-5 h-5 rounded-full bg-red-100 flex items-center justify-center">
-                    <X className="size-3 text-red-500" />
+                  <div className="mt-0.5 shrink-0 w-5 h-5 rounded-full bg-red-500/10 flex items-center justify-center">
+                    <X className="size-3 text-red-400" />
                   </div>
-                  <p className="text-sm text-red-800/80">{item}</p>
+                  <p className="text-sm text-white/50">{item}</p>
                 </motion.div>
               ))}
             </div>
@@ -567,9 +600,14 @@ function ProblemSection() {
             initial="hidden"
             whileInView="visible"
             viewport={{ once: true }}
-            className="rounded-2xl border border-green-100 bg-green-50/50 p-8"
+            className="rounded-2xl border border-[#035EF9]/20 bg-gradient-to-br from-[#035EF9]/5 to-white p-8"
           >
-            <h3 className="text-lg font-semibold text-green-700 mb-6">With SellerCrew</h3>
+            <div className="flex items-center gap-2 mb-6">
+              <div className="w-8 h-8 rounded-lg bg-[#035EF9]/10 flex items-center justify-center">
+                <Check className="size-4 text-[#035EF9]" />
+              </div>
+              <h3 className="text-lg font-semibold text-[#0B0F1A]">With SellerCrew</h3>
+            </div>
             <div className="space-y-4">
               {withItems.map((item) => (
                 <motion.div
@@ -577,10 +615,10 @@ function ProblemSection() {
                   variants={fadeUp}
                   className="flex items-start gap-3"
                 >
-                  <div className="mt-0.5 shrink-0 w-5 h-5 rounded-full bg-green-100 flex items-center justify-center">
-                    <Check className="size-3 text-green-600" />
+                  <div className="mt-0.5 shrink-0 w-5 h-5 rounded-full bg-[#035EF9]/10 flex items-center justify-center">
+                    <Check className="size-3 text-[#035EF9]" />
                   </div>
-                  <p className="text-sm text-green-800/80">{item}</p>
+                  <p className="text-sm text-[#0B0F1A]/80">{item}</p>
                 </motion.div>
               ))}
             </div>
@@ -1287,7 +1325,7 @@ function FAQSection() {
   ];
 
   return (
-    <section className="py-24 sm:py-32 bg-gray-50">
+    <section className="py-24 sm:py-32 bg-white">
       <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
         <motion.div
           variants={fadeUp}
@@ -1309,14 +1347,15 @@ function FAQSection() {
           initial="hidden"
           whileInView="visible"
           viewport={{ once: true }}
+          className="rounded-2xl border border-gray-200/80 bg-white shadow-sm divide-y divide-gray-100"
         >
           <Accordion type="single" collapsible className="w-full">
             {faqs.map((faq, idx) => (
-              <AccordionItem key={idx} value={`faq-${idx}`}>
-                <AccordionTrigger className="text-left text-sm font-medium text-[#0B0F1A] hover:no-underline">
+              <AccordionItem key={idx} value={`faq-${idx}`} className="border-b-0 px-6">
+                <AccordionTrigger className="text-left text-sm font-semibold text-[#0B0F1A] hover:no-underline hover:text-[#035EF9] transition-colors py-5">
                   {faq.q}
                 </AccordionTrigger>
-                <AccordionContent className="text-sm text-gray-500 leading-relaxed">
+                <AccordionContent className="text-sm text-gray-500 leading-relaxed pb-5">
                   {faq.a}
                 </AccordionContent>
               </AccordionItem>
