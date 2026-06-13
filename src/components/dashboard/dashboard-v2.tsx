@@ -746,9 +746,12 @@ export function DashboardV2() {
 
   const isAdmin = user?.role === 'admin';
 
-  // Regular users may only reach non-admin pages; block direct/persisted access.
-  const adminOnlyPage = navGroups.find((group) => group.items.some((item) => item.page === dashboardPage))?.adminOnly;
-  const effectivePage: DashboardPage = !isAdmin && adminOnlyPage ? 'home' : dashboardPage;
+  // The main app is the listing workspace only. Everything else lives in the
+  // separate /admin dashboard, so non-workspace pages fall back to Home here.
+  const workspacePages = new Set<DashboardPage>([
+    'home', 'projects', 'listing-builder', 'listings', 'assets', 'project-detail',
+  ]);
+  const effectivePage: DashboardPage = workspacePages.has(dashboardPage) ? dashboardPage : 'home';
 
   const sidebarWidth = sidebarOpen ? 260 : 64;
 
@@ -882,10 +885,7 @@ export function DashboardV2() {
           {/* Navigation */}
           <ScrollArea className="min-h-0 flex-1 py-2">
             <nav className="px-2 space-y-1">
-              {navGroups.map((group) => {
-                // Hide admin-only groups for non-admin users
-                if (group.adminOnly && !isAdmin) return null;
-
+              {navGroups.filter((group) => group.label === 'Workspace').map((group) => {
                 return (
                   <div key={group.label} className="mb-3">
                     {/* Group Label */}
@@ -1174,15 +1174,17 @@ export function DashboardV2() {
                     </div>
                   </DropdownMenuLabel>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem className="cursor-pointer" onClick={() => setDashboardPage('admin-users')}>
-                    <User className="mr-2 h-4 w-4" />
-                    Profile
-                  </DropdownMenuItem>
-                  <DropdownMenuItem className="cursor-pointer" onClick={() => setDashboardPage('admin-orgs')}>
-                    <Settings className="mr-2 h-4 w-4" />
-                    Settings
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
+                  {isAdmin && (
+                    <>
+                      <DropdownMenuItem asChild className="cursor-pointer">
+                        <a href="/admin">
+                          <ShieldCheck className="mr-2 h-4 w-4" />
+                          Admin Dashboard
+                        </a>
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                    </>
+                  )}
                   <DropdownMenuItem
                     className="cursor-pointer text-red-600 focus:text-red-600"
                     onClick={() => {
