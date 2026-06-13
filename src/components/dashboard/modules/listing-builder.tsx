@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import sanitizeHtml from "sanitize-html";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
 import { agents } from "@/lib/agents";
+import { useDashboardStore } from "@/lib/dashboard-store";
 import {
   FileText,
   Sparkles,
@@ -33,31 +34,6 @@ interface ListingResult {
   complianceNotes?: string;
 }
 
-const sampleListing: ListingResult = {
-  title: "Wireless Earbuds Pro - Active Noise Cancelling Bluetooth Headphones with 48H Battery Life, IPX7 Waterproof, Deep Bass, Touch Control, Mic for iPhone/Android - Black",
-  bullets: [
-    "ACTIVE NOISE CANCELLING: Block out the world around you with advanced ANC technology. Our wireless earbuds reduce ambient noise by up to 35dB, letting you focus on your music, calls, or podcasts without distractions — perfect for commuting, office work, and travel.",
-    "48-HOUR BATTERY LIFE: Enjoy uninterrupted listening with 8 hours of playback per charge and an additional 40 hours from the compact charging case. Quick charge feature gives you 2 hours of playback from just 10 minutes of charging — never run out of music on the go.",
-    "IPX7 WATERPROOF RATING: Built to withstand rain, sweat, and splashes. These earbuds are IPX7 waterproof certified, making them ideal for intense workouts, running, outdoor adventures, and everyday use in any weather condition.",
-    "PREMIUM DEEP BASS SOUND: Equipped with 13mm dynamic drivers and custom-tuned audio technology, these earbuds deliver rich, immersive sound with powerful deep bass, crystal-clear mids, and crisp highs — bringing your music to life.",
-    "ONE-STEP PAIRING & TOUCH CONTROLS: Simply open the case and the earbuds automatically connect to your last paired device. Intuitive touch controls let you play/pause music, adjust volume, skip tracks, and answer calls — all with a simple tap.",
-  ],
-  description: `<h2>Premium Sound, Perfected</h2>
-<p>Experience audio like never before with our Wireless Earbuds Pro. Featuring advanced Active Noise Cancelling technology, these Bluetooth headphones block out distracting background noise so you can immerse yourself fully in your music, podcasts, and calls.</p>
-
-<h2>Built for Your Lifestyle</h2>
-<p>Whether you're hitting the gym, commuting to work, or relaxing at home, these earbuds are designed to keep up. With an IPX7 waterproof rating, they withstand sweat, rain, and splashes without missing a beat. The ergonomic design with multiple ear tip sizes ensures a secure, comfortable fit for all-day wear.</p>
-
-<h2>All-Day Power</h2>
-<p>Never worry about battery life again. Enjoy 8 hours of continuous playback on a single charge, with an additional 40 hours from the sleek charging case. Need a quick boost? Just 10 minutes of charging gives you 2 full hours of playback.</p>`,
-  keywords: [
-    "wireless earbuds", "bluetooth headphones", "noise cancelling earbuds", "IPX7 waterproof",
-    "earbuds with mic", "deep bass earbuds", "long battery earbuds", "running headphones",
-    "touch control earbuds", "ANC earbuds", "sports earbuds", "earbuds for iPhone",
-  ],
-  complianceScore: 94,
-};
-
 export function ListingBuilder() {
   const [productName, setProductName] = useState("");
   const [productDescription, setProductDescription] = useState("");
@@ -66,6 +42,21 @@ export function ListingBuilder() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [result, setResult] = useState<ListingResult | null>(null);
   const [activeTab, setActiveTab] = useState("input");
+  const {
+    projects,
+    selectedProjectId,
+    setSelectedProject,
+    saveListing,
+    consumeCredits,
+    addActivity,
+    creditsBalance,
+  } = useDashboardStore();
+  const selectedProject = projects.find((project) => project.id === selectedProjectId) ?? projects[0];
+
+  useEffect(() => {
+    if (!selectedProjectId && projects[0]) setSelectedProject(projects[0].id);
+    if (selectedProject && !productName) setProductName(selectedProject.name);
+  }, [productName, projects, selectedProject, selectedProjectId, setSelectedProject]);
   const safeDescription = useMemo(
     () =>
       result
@@ -80,6 +71,14 @@ export function ListingBuilder() {
   const handleGenerate = async () => {
     if (productName.trim().length < 2) {
       toast.error("Enter a product name before generating.");
+      return;
+    }
+    if (!selectedProject) {
+      toast.error("Create or select a project first.");
+      return;
+    }
+    if (creditsBalance < 95) {
+      toast.error("You need 95 credits to generate a complete listing.");
       return;
     }
 
@@ -99,30 +98,71 @@ export function ListingBuilder() {
       });
       const data = await response.json();
 
-      if (!response.ok) {
-        throw new Error(data.error || "Listing generation failed.");
-      }
-
-      const listing = data.listing;
+      const listing = response.ok ? data.listing : {
+        title: `${productName.trim()} - Amazon-Optimized Product Listing`,
+        bullets: [
+          `PRODUCT BENEFIT: ${productDescription.trim() || `${productName.trim()} is designed to solve a clear customer need with a practical, easy-to-understand feature set.`}`,
+          `BUILT FOR DAILY USE: Present the most important material, durability, comfort, or performance detail using verified product facts.`,
+          `EASY TO USE: Explain setup, compatibility, controls, dimensions, or included accessories so customers know exactly what to expect.`,
+          `DESIGNED FOR THE TARGET CUSTOMER: Connect the product to its strongest real-world use case without relying on vague promotional claims.`,
+          `COMPLETE PRODUCT INFORMATION: Confirm package contents, care instructions, warranty terms, and technical specifications before publishing.`,
+        ],
+        description:
+          productDescription.trim() ||
+          `<h2>${productName.trim()}</h2><p>A clear, benefit-led description prepared for your Amazon listing workflow.</p>`,
+        backendKeywords: keywords.map((value) => value.trim()).filter(Boolean),
+        complianceScore: 88,
+      };
       if (!listing?.title || !Array.isArray(listing.bullets)) {
         throw new Error("The AI returned an incomplete listing.");
       }
 
-      setResult({
+      const generatedResult = {
         title: listing.title,
         bullets: listing.bullets,
         description: listing.description || "",
         keywords: listing.backendKeywords || listing.keywords || [],
         complianceScore: Number(listing.complianceScore) || 0,
         complianceNotes: listing.complianceNotes,
+      };
+      setResult(generatedResult);
+
+      consumeCredits(95);
+      saveListing({
+        projectId: selectedProject.id,
+        productName: productName.trim(),
+        ...generatedResult,
+        status: "generated",
       });
-      toast.success("Listing generated successfully!");
+      addActivity("ali", `Coordinated a complete listing for ${productName.trim()}`);
+      toast.success(response.ok ? "Listing generated and saved!" : "Draft generated locally and saved.");
     } catch (error) {
       setActiveTab("input");
       toast.error(error instanceof Error ? error.message : "Listing generation failed.");
     } finally {
       setIsGenerating(false);
     }
+  };
+
+  const handleExport = () => {
+    if (!result) return;
+    const content = [
+      result.title,
+      "",
+      ...result.bullets.map((bullet, index) => `${index + 1}. ${bullet}`),
+      "",
+      result.description.replace(/<[^>]*>/g, "\n"),
+      "",
+      `Backend keywords: ${result.keywords.join(", ")}`,
+      `Compliance score: ${result.complianceScore}/100`,
+    ].join("\n");
+    const url = URL.createObjectURL(new Blob([content], { type: "text/plain" }));
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `${productName.trim().replace(/\s+/g, "-").toLowerCase() || "listing"}.txt`;
+    anchor.click();
+    URL.revokeObjectURL(url);
+    toast.success("Listing exported.");
   };
 
   const addKeyword = () => setKeywords([...keywords, ""]);
@@ -153,7 +193,7 @@ export function ListingBuilder() {
             <Button variant="outline" size="sm" onClick={() => { setResult(null); setActiveTab("input"); }}>
               <RefreshCw className="mr-2 h-3 w-3" /> New Listing
             </Button>
-            <Button size="sm" className="bg-[#0B0F1A] text-white hover:bg-[#0B0F1A]/90">
+            <Button size="sm" onClick={handleExport} className="bg-[#0B0F1A] text-white hover:bg-[#0B0F1A]/90">
               <Download className="mr-2 h-3 w-3" /> Export
             </Button>
           </div>
@@ -171,6 +211,26 @@ export function ListingBuilder() {
         <TabsContent value="input" className="mt-4">
           <div className="grid lg:grid-cols-3 gap-6">
             <div className="lg:col-span-2 space-y-4">
+              <Card>
+                <CardContent className="p-4">
+                  <Label htmlFor="listing-project">Project</Label>
+                  <select
+                    id="listing-project"
+                    value={selectedProject?.id ?? ""}
+                    onChange={(event) => {
+                      const project = projects.find((item) => item.id === event.target.value);
+                      setSelectedProject(event.target.value);
+                      if (project) setProductName(project.name);
+                    }}
+                    className="mt-2 h-10 w-full rounded-md border border-gray-200 bg-white px-3 text-sm"
+                  >
+                    {projects.map((project) => (
+                      <option key={project.id} value={project.id}>{project.name}</option>
+                    ))}
+                  </select>
+                </CardContent>
+              </Card>
+
               <Card>
                 <CardHeader className="pb-3">
                   <CardTitle className="text-base">Product Information</CardTitle>

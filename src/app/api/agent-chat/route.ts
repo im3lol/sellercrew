@@ -1,46 +1,46 @@
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
+import { generateAIText } from "@/lib/ai/providers";
+import { guard } from "@/lib/api-guard";
+
+export const runtime = "nodejs";
+
+const requestSchema = z.object({
+  agentId: z.string().trim().min(1).max(50),
+  message: z.string().trim().min(1).max(8_000),
+  systemPrompt: z.string().trim().max(8_000).optional(),
+  history: z.array(z.object({
+    role: z.enum(["user", "assistant"]),
+    content: z.string().trim().min(1).max(8_000),
+  })).max(30).optional().default([]),
+});
 
 export async function POST(request: NextRequest) {
-  try {
-    const { agentId, message, systemPrompt, history } = await request.json();
+  const access = guard(request, { scope: "agent-chat", limit: 30, windowMs: 60 * 1000 });
+  if (!access.ok) return access.response;
 
-    if (!agentId || !message) {
+  try {
+    const parsed = requestSchema.safeParse(await request.json());
+    if (!parsed.success) {
       return NextResponse.json(
-        { error: "agentId and message are required" },
+        { error: "Please provide a valid agent message." },
         { status: 400 }
       );
     }
 
-    // Use z-ai-web-dev-sdk for AI chat
-    const ZAI = (await import("z-ai-web-dev-sdk")).default;
-    const zai = await ZAI.create();
-
-    const messages = [
-      {
-        role: "system" as const,
-        content: systemPrompt || "You are a helpful AI assistant specialized in Amazon product listings.",
-      },
-      ...(history || []).map((msg: { role: string; content: string }) => ({
-        role: msg.role as "user" | "assistant",
-        content: msg.content,
-      })),
-      {
-        role: "user" as const,
-        content: message,
-      },
-    ];
-
-    const completion = await zai.chat.completions.create({
-      messages,
-      temperature: 0.7,
-      max_tokens: 1000,
+    const { agentId, message, systemPrompt, history } = parsed.data;
+    const result = await generateAIText({
+      system: systemPrompt || "You are a helpful AI assistant specialized in Amazon product listings.",
+      prompt: message,
+      history,
+      maxTokens: 1_000,
     });
-
-    const responseContent = completion.choices?.[0]?.message?.content || "I'm sorry, I couldn't generate a response.";
 
     return NextResponse.json({
       agentId,
-      content: responseContent,
+      content: result.text,
+      provider: result.provider,
+      model: result.model,
       timestamp: new Date().toISOString(),
     });
   } catch (error: unknown) {

@@ -76,6 +76,70 @@ const sampleAnalysis: AnalysisResult = {
   ],
 };
 
+function analyzeListing(listingText: string): AnalysisResult {
+  const text = listingText.trim();
+  const lower = text.toLowerCase();
+  const lines = text.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+  const title = lines[0] ?? "";
+  const bullets = lines.filter((line) => /^[-•*]|\d+\./.test(line));
+  const titleScore = Math.max(35, 100 - Math.abs(140 - title.length) / 2);
+  const bulletsScore = Math.min(100, 35 + bullets.length * 13);
+  const descriptionScore = Math.min(100, 35 + Math.floor(text.length / 35));
+  const keywordScore = Math.min(100, 45 + new Set(lower.match(/[a-z0-9]{4,}/g) ?? []).size / 2);
+  const riskyTerms = ["best seller", "#1", "guaranteed", "free shipping"].filter((term) => lower.includes(term));
+  const complianceScore = Math.max(40, 100 - riskyTerms.length * 18);
+  const recommendations: AnalysisResult["recommendations"] = [];
+
+  if (title.length < 80 || title.length > 200) {
+    recommendations.push({
+      category: "Title",
+      issue: `Title length is ${title.length || 0} characters`,
+      fix: "Keep the title between 80 and 200 characters with the primary keyword near the beginning.",
+      severity: "high",
+    });
+  }
+  if (bullets.length < 5) {
+    recommendations.push({
+      category: "Bullets",
+      issue: `Only ${bullets.length} bullet-style lines were detected`,
+      fix: "Add five benefit-led bullets covering the main purchase questions.",
+      severity: "medium",
+    });
+  }
+  if (text.length < 600) {
+    recommendations.push({
+      category: "Description",
+      issue: "The listing copy is too short to explain the product fully",
+      fix: "Add a structured description covering audience, benefits, use cases, and included items.",
+      severity: "medium",
+    });
+  }
+  riskyTerms.forEach((term) => recommendations.push({
+    category: "Compliance",
+    issue: `Potentially risky phrase detected: "${term}"`,
+    fix: "Replace promotional or absolute claims with factual, verifiable language.",
+    severity: "high",
+  }));
+  if (!recommendations.length) {
+    recommendations.push({
+      category: "Quality",
+      issue: "No major structural issues detected",
+      fix: "Complete a final product-fact and marketplace-policy review before publishing.",
+      severity: "low",
+    });
+  }
+
+  return {
+    overallScore: Math.round((titleScore + bulletsScore + descriptionScore + keywordScore + complianceScore) / 5),
+    titleScore: Math.round(titleScore),
+    bulletsScore: Math.round(bulletsScore),
+    descriptionScore: Math.round(descriptionScore),
+    keywordScore: Math.round(keywordScore),
+    complianceScore,
+    recommendations,
+  };
+}
+
 export function ListingAnalyzer() {
   const [listingText, setListingText] = useState("");
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -88,7 +152,7 @@ export function ListingAnalyzer() {
     }
     setIsAnalyzing(true);
     setTimeout(() => {
-      setResult(sampleAnalysis);
+      setResult(analyzeListing(listingText));
       setIsAnalyzing(false);
       toast.success("Analysis complete!");
     }, 2500);

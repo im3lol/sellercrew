@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 import { toast } from "sonner";
+import { useDashboardStore } from "@/lib/dashboard-store";
 
 interface ChatMessage {
   id: string;
@@ -33,13 +34,13 @@ export function AgentsView() {
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const addActivity = useDashboardStore((state) => state.addActivity);
 
   const activeAgent = agents.find((a) => a.id === activeAgentId)!;
 
-  // Sync with external selectedAgent prop without calling setState in effect
-  if (selectedAgent && selectedAgent !== activeAgentId) {
-    setActiveAgentId(selectedAgent);
-  }
+  useEffect(() => {
+    if (selectedAgent) setActiveAgentId(selectedAgent);
+  }, [selectedAgent]);
 
   useEffect(() => {
     scrollRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -59,6 +60,40 @@ export function AgentsView() {
     setMessages((prev) => [...prev, userMessage]);
     setInput("");
     setIsLoading(true);
+
+    try {
+      const response = await fetch("/api/agent-chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          agentId: activeAgentId,
+          message: userMessage.content,
+          systemPrompt: activeAgent.systemPrompt,
+          history: messages.map((message) => ({
+            role: message.isUser ? "user" : "assistant",
+            content: message.content,
+          })),
+        }),
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: (Date.now() + 1).toString(),
+            agentId: activeAgentId,
+            content: data.content,
+            isUser: false,
+            timestamp: new Date(),
+          },
+        ]);
+        addActivity(activeAgentId, `Responded to: ${userMessage.content.slice(0, 70)}`);
+        setIsLoading(false);
+        return;
+      }
+    } catch {
+      toast.info("Using the local agent fallback.");
+    }
 
     // Simulate AI response
     setTimeout(() => {
@@ -133,21 +168,22 @@ export function AgentsView() {
       };
 
       setMessages((prev) => [...prev, agentMessage]);
+      addActivity(activeAgentId, `Responded locally to: ${userMessage.content.slice(0, 70)}`);
       setIsLoading(false);
     }, 1500);
   };
 
   return (
-    <div className="max-w-5xl h-[calc(100vh-8rem)] flex gap-6">
+    <div className="flex min-h-[calc(100vh-8rem)] max-w-5xl flex-col gap-4 md:h-[calc(100vh-8rem)] md:flex-row md:gap-6">
       {/* Agent List */}
-      <div className="w-64 shrink-0">
+      <div className="w-full shrink-0 md:w-64">
         <Card className="h-full">
           <CardHeader className="pb-3">
             <CardTitle className="text-base">AI Agents</CardTitle>
           </CardHeader>
           <CardContent className="p-0">
-            <ScrollArea className="h-[calc(100vh-16rem)]">
-              <div className="px-3 pb-3 space-y-1">
+            <ScrollArea className="h-24 md:h-[calc(100vh-16rem)]">
+              <div className="flex gap-2 px-3 pb-3 md:block md:space-y-1">
                 {agents.map((agent) => (
                   <button
                     key={agent.id}
@@ -155,7 +191,7 @@ export function AgentsView() {
                       setActiveAgentId(agent.id);
                       setSelectedAgent(agent.id);
                     }}
-                    className={`w-full flex items-center gap-2 p-2 rounded-lg transition-colors ${
+                    className={`flex min-w-36 items-center gap-2 rounded-lg p-2 transition-colors md:w-full md:min-w-0 ${
                       activeAgentId === agent.id
                         ? "bg-[#0B0F1A] text-white"
                         : "hover:bg-gray-100"

@@ -33,6 +33,7 @@ import {
   CheckCircle2,
 } from 'lucide-react';
 import Image from 'next/image';
+import { toast } from 'sonner';
 import { agents } from '@/lib/agents';
 
 // ─── Animation Variants ──────────────────────────────────────────────────────
@@ -247,7 +248,7 @@ function AuthLayout({ children }: { children: React.ReactNode }) {
 // ─── Login Page ──────────────────────────────────────────────────────────────
 
 function LoginPage() {
-  const { setAuthPage, login } = useAppStore();
+  const { setAuthPage, applyAccount } = useAppStore();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -275,16 +276,23 @@ function LoginPage() {
     if (!validate()) return;
 
     setIsLoading(true);
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 1200));
-
-    login({
-      id: 'demo-user',
-      email: email,
-      name: 'Demo User',
-      avatar: null,
-    });
-    setIsLoading(false);
+    try {
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email.trim(), password }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data?.user) {
+        setErrors({ password: data?.error || 'Sign in failed. Please try again.' });
+        return;
+      }
+      applyAccount({ user: data.user, workspace: data.workspace ?? null });
+    } catch {
+      setErrors({ password: 'Network error. Please try again.' });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -423,17 +431,9 @@ function LoginPage() {
             type="button"
             variant="outline"
             className="h-12 w-full rounded-xl border-slate-200 bg-white text-[15px] font-medium text-slate-700 shadow-sm hover:bg-slate-50"
-            onClick={() => {
-              setIsLoading(true);
-              setTimeout(() => {
-                login({
-                  id: 'demo-user',
-                  email: 'demo@sellercrew.ai',
-                  name: 'Demo User',
-                  avatar: null,
-                });
-              }, 800);
-            }}
+            onClick={() =>
+              toast.info('Google sign-in is not configured yet. Please use your email and password.')
+            }
           >
             <svg className="h-4 w-4 mr-2" viewBox="0 0 24 24">
               <path
@@ -480,7 +480,7 @@ function LoginPage() {
 // ─── Register Page ───────────────────────────────────────────────────────────
 
 function RegisterPage() {
-  const { setAuthPage, login } = useAppStore();
+  const { setAuthPage, applyAccount } = useAppStore();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -526,16 +526,23 @@ function RegisterPage() {
     if (!validate()) return;
 
     setIsLoading(true);
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 1200));
-
-    login({
-      id: 'demo-user',
-      email: email,
-      name: name.trim(),
-      avatar: null,
-    });
-    setIsLoading(false);
+    try {
+      const res = await fetch('/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: name.trim(), email: email.trim(), password }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data?.user) {
+        setErrors({ email: data?.error || 'Could not create the account.' });
+        return;
+      }
+      applyAccount({ user: data.user, workspace: data.workspace ?? null });
+    } catch {
+      setErrors({ email: 'Network error. Please try again.' });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   // Password strength indicator
@@ -940,7 +947,7 @@ function ForgotPasswordPage() {
 // ─── Verify Email Page ───────────────────────────────────────────────────────
 
 function VerifyEmailPage() {
-  const { setAuthPage, login } = useAppStore();
+  const { setAuthPage } = useAppStore();
   const [otp, setOtp] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isResending, setIsResending] = useState(false);
@@ -968,16 +975,12 @@ function VerifyEmailPage() {
     }
     setError('');
     setIsLoading(true);
-    await new Promise((resolve) => setTimeout(resolve, 1200));
-
-    // Mock verification — accept any 6-digit code
-    login({
-      id: 'demo-user',
-      email: 'demo@sellercrew.ai',
-      name: 'Demo User',
-      avatar: null,
-    });
+    await new Promise((resolve) => setTimeout(resolve, 800));
     setIsLoading(false);
+    // Email verification is not enforced server-side yet. Accounts are active
+    // immediately after sign-up, so send the user to sign in.
+    toast.success('Your account is ready. Please sign in to continue.');
+    setAuthPage('login');
   };
 
   const handleResend = async () => {

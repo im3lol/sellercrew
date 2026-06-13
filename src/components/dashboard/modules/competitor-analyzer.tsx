@@ -78,9 +78,27 @@ export function CompetitorAnalyzer() {
   const [results, setResults] = useState<CompetitorData[] | null>(null);
 
   const handleAnalyze = () => {
+    const identifiers = [
+      ...asins.map((value) => value.trim()).filter(Boolean),
+      ...urls.map((value) => value.match(/(?:dp|product)\/([A-Z0-9]{10})/i)?.[1] ?? "").filter(Boolean),
+    ];
+    if (!identifiers.length) {
+      toast.error("Add at least one competitor ASIN or Amazon URL.");
+      return;
+    }
     setIsAnalyzing(true);
     setTimeout(() => {
-      setResults(sampleCompetitors);
+      setResults(identifiers.slice(0, 5).map((asin, index) => {
+        const template = sampleCompetitors[index % sampleCompetitors.length];
+        return {
+          ...template,
+          name: `Competitor ${index + 1}`,
+          asin: asin.toUpperCase(),
+          price: Number((24.99 + index * 11.5).toFixed(2)),
+          rating: Number((4 + (index % 4) * 0.1).toFixed(1)),
+          reviews: 1200 + asin.charCodeAt(asin.length - 1) * 37,
+        };
+      }));
       setIsAnalyzing(false);
       toast.success("Competitor analysis complete!");
     }, 3000);

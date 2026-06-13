@@ -15,10 +15,16 @@ node_modules
 
 # next.js
 /.next/
+/.next-local/
+/.next-local-build/
 /out/
 
 # production
 /build
+
+# local database (SQLite) — recreate with `bun run db:push`
+/db/*.db
+/db/*.db-journal
 
 # misc
 .DS_Store
@@ -32,6 +38,7 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+!.env.example
 
 # vercel
 .vercel

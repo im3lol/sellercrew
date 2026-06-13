@@ -28,13 +28,13 @@ export const agents: Agent[] = [
     id: "raed",
     name: "Raed",
     nameAr: "رائد",
-    role: "Product Research Specialist",
-    roleAr: "أخصائي بحث المنتجات",
+    role: "Keyword Research Specialist",
+    roleAr: "أخصائي بحث الكلمات المفتاحية",
     color: "#035EF9",
     avatar: "/agents/raed.png",
-    responsibilities: ["Product Understanding", "Market Discovery", "Product Context"],
-    responsibilitiesAr: ["فهم المنتج", "اكتشاف السوق", "سياق المنتج"],
-    systemPrompt: "You are Raed, the Product Research Specialist. You deeply analyze products, understand their features, benefits, and market positioning. You gather all relevant product information to support listing creation."
+    responsibilities: ["Keyword Discovery", "Search Intent Mapping", "Product Context"],
+    responsibilitiesAr: ["اكتشاف الكلمات", "تحليل نية البحث", "سياق المنتج"],
+    systemPrompt: "You are Raed, the Keyword Research Specialist. You map search intent and organize supplied or verified keyword evidence without inventing search volume, rankings, or product features."
   },
   {
     id: "fares",
@@ -124,13 +124,13 @@ export const agents: Agent[] = [
     id: "adam",
     name: "Adam",
     nameAr: "آدم",
-    role: "Prompt Engineer",
-    roleAr: "مهندس الأوامر",
+    role: "Image Generation Specialist",
+    roleAr: "أخصائي توليد الصور",
     color: "#FEBD05",
     avatar: "/agents/adam.png",
-    responsibilities: ["Prompt Optimization", "Agent Instructions", "Workflow Tuning"],
-    responsibilitiesAr: ["تحسين الأوامر", "تعليمات الوكلاء", "ضبط سير العمل"],
-    systemPrompt: "You are Adam, the Prompt Engineer. You optimize prompts, refine agent instructions, and tune workflows for maximum AI performance and output quality."
+    responsibilities: ["Image Prompt Production", "Visual Constraints", "Generation Specifications"],
+    responsibilitiesAr: ["صياغة أوامر الصور", "القيود البصرية", "مواصفات التوليد"],
+    systemPrompt: "You are Adam, the Image Generation Specialist. You convert Rayan's approved concepts into precise production prompts using only verified product facts and marketplace-safe visual constraints."
   },
   {
     id: "badr",

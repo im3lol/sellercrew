@@ -153,7 +153,13 @@ export function ImageBriefGenerator() {
     }
     setIsGenerating(true);
     setTimeout(() => {
-      setBriefs(sampleBriefs);
+      setBriefs(sampleBriefs.map((brief) => ({
+        ...brief,
+        title: `${productName.trim()} · ${brief.title}`,
+        description: `${brief.description} Product context: ${
+          productDesc.trim() || `${productName.trim()} should remain the clear focal point.`
+        }`,
+      })));
       setIsGenerating(false);
       toast.success("Image briefs generated!");
     }, 3000);

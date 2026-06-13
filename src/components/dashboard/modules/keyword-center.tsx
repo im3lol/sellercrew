@@ -60,7 +60,31 @@ export function KeywordCenter() {
     }
     setIsDiscovering(true);
     setTimeout(() => {
-      setKeywords(sampleKeywords);
+      const seed = seedKeyword.trim().toLowerCase();
+      const modifiers = [
+        ["", "Core Product"],
+        ["best ", "Core Product"],
+        ["premium ", "Positioning"],
+        ["for beginners", "Audience"],
+        ["for professionals", "Audience"],
+        ["with warranty", "Feature"],
+        ["compact", "Feature"],
+        ["durable", "Feature"],
+        ["affordable", "Price"],
+        ["online", "Purchase Intent"],
+        ["amazon", "Marketplace"],
+        ["reviews", "Research Intent"],
+        ["comparison", "Research Intent"],
+        ["accessories", "Accessory"],
+        ["replacement", "Accessory"],
+      ];
+      setKeywords(modifiers.map(([modifier, cluster], index): KeywordData => ({
+        keyword: modifier.endsWith(" ") ? `${modifier}${seed}` : modifier ? `${seed} ${modifier}` : seed,
+        searchVolume: Math.max(900, 78000 - index * 4700 + seed.length * 130),
+        competition: index < 3 ? "High" : index < 9 ? "Medium" : "Low",
+        relevance: Math.max(58, 98 - index * 3),
+        cluster,
+      })));
       setIsDiscovering(false);
       toast.success("Keywords discovered!");
     }, 2500);

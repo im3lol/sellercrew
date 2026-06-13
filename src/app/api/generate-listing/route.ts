@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import sanitizeHtml from "sanitize-html";
 import { z } from "zod";
+import { generateAIText, parseAIJson } from "@/lib/ai/providers";
+import { guard } from "@/lib/api-guard";
+
+export const runtime = "nodejs";
 
 const requestSchema = z.object({
   productName: z.string().trim().min(2).max(200),
@@ -9,7 +13,19 @@ const requestSchema = z.object({
   competitorAsins: z.array(z.string().trim().min(1).max(20)).max(20).optional().default([]),
 });
 
+const listingSchema = z.object({
+  title: z.string().trim().min(1).max(200),
+  bullets: z.array(z.string().trim().min(1).max(500)).min(1).max(5),
+  description: z.string(),
+  backendKeywords: z.array(z.string().trim().min(1).max(100)).max(30),
+  complianceScore: z.number().min(0).max(100),
+  complianceNotes: z.string().optional(),
+});
+
 export async function POST(request: NextRequest) {
+  const access = guard(request, { scope: "generate-listing", limit: 15, windowMs: 60 * 1000 });
+  if (!access.ok) return access.response;
+
   try {
     const parsed = requestSchema.safeParse(await request.json());
     if (!parsed.success) {
@@ -20,9 +36,6 @@ export async function POST(request: NextRequest) {
     }
 
     const { productName, productDescription, keywords, competitorAsins } = parsed.data;
-    const ZAI = (await import("z-ai-web-dev-sdk")).default;
-    const zai = await ZAI.create();
-
     const prompt = `You are a team of Amazon listing experts. Generate a complete Amazon product listing for:
 
 Product: ${productName}
@@ -42,23 +55,13 @@ Generate the following in JSON format:
 
 Ensure the listing is Amazon-compliant, keyword-optimized, and conversion-focused.`;
 
-    const completion = await zai.chat.completions.create({
-      messages: [
-        { role: "system", content: "You are an expert Amazon listing optimization team. Always respond with valid JSON." },
-        { role: "user", content: prompt },
-      ],
-      temperature: 0.7,
-      max_tokens: 2000,
+    const completion = await generateAIText({
+      system: "You are an expert Amazon listing optimization team.",
+      prompt,
+      json: true,
+      maxTokens: 6_000,
     });
-
-    let result;
-    try {
-      const content = completion.choices?.[0]?.message?.content || "";
-      const jsonMatch = content.match(/\{[\s\S]*\}/);
-      result = jsonMatch ? JSON.parse(jsonMatch[0]) : { rawContent: content };
-    } catch {
-      result = { rawContent: completion.choices?.[0]?.message?.content };
-    }
+    const result = listingSchema.parse(parseAIJson(completion.text));
 
     if (result.description) {
       result.description = sanitizeHtml(result.description, {
@@ -70,6 +73,8 @@ Ensure the listing is Amazon-compliant, keyword-optimized, and conversion-focuse
     return NextResponse.json({
       success: true,
       listing: result,
+      provider: completion.provider,
+      model: completion.model,
       timestamp: new Date().toISOString(),
     });
   } catch (error: unknown) {
