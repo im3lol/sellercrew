@@ -151,7 +151,6 @@ const navGroups: NavGroup[] = [
   },
   {
     label: 'Standalone Tools',
-    adminOnly: true,
     items: [
       { page: 'listing-analyzer', label: 'Listing Review', icon: FileSearch },
       { page: 'research-report', label: 'Product Research', icon: Search },
@@ -164,7 +163,6 @@ const navGroups: NavGroup[] = [
   },
   {
     label: 'Team',
-    adminOnly: true,
     items: [
       { page: 'agents', label: 'AI Agents', icon: Bot },
       { page: 'agent-performance', label: 'Performance', icon: TrendingUp },
@@ -173,24 +171,11 @@ const navGroups: NavGroup[] = [
   },
   {
     label: 'Billing',
-    adminOnly: true,
     items: [
       { page: 'plans', label: 'Plans & Credits', icon: CreditCard },
       { page: 'usage', label: 'Usage', icon: Activity },
       { page: 'invoices', label: 'Invoices', icon: Receipt },
       { page: 'credits', label: 'Credit History', icon: Zap },
-    ],
-  },
-  {
-    label: 'Admin',
-    adminOnly: true,
-    items: [
-      { page: 'admin-overview', label: 'System Status', icon: LayoutDashboard },
-      { page: 'admin-policies', label: 'Policy Bank', icon: ShieldCheck },
-      { page: 'admin-settings', label: 'Settings & API', icon: Settings },
-      { page: 'admin-users', label: 'Users', icon: Users },
-      { page: 'admin-orgs', label: 'Organizations', icon: Building2 },
-      { page: 'admin-analytics', label: 'Analytics', icon: BarChart2 },
     ],
   },
 ];
@@ -746,12 +731,13 @@ export function DashboardV2() {
 
   const isAdmin = user?.role === 'admin';
 
-  // The main app is the listing workspace only. Everything else lives in the
-  // separate /admin dashboard, so non-workspace pages fall back to Home here.
-  const workspacePages = new Set<DashboardPage>([
-    'home', 'projects', 'listing-builder', 'listings', 'assets', 'project-detail',
+  // Admin pages live only in the separate /admin dashboard; if one is somehow
+  // selected here (e.g. persisted state), fall back to Home.
+  const adminPages = new Set<DashboardPage>([
+    'admin-overview', 'admin-settings', 'admin-policies',
+    'admin-users', 'admin-orgs', 'admin-subscriptions', 'admin-analytics',
   ]);
-  const effectivePage: DashboardPage = workspacePages.has(dashboardPage) ? dashboardPage : 'home';
+  const effectivePage: DashboardPage = adminPages.has(dashboardPage) ? 'home' : dashboardPage;
 
   const sidebarWidth = sidebarOpen ? 260 : 64;
 
@@ -885,7 +871,7 @@ export function DashboardV2() {
           {/* Navigation */}
           <ScrollArea className="min-h-0 flex-1 py-2">
             <nav className="px-2 space-y-1">
-              {navGroups.filter((group) => group.label === 'Workspace').map((group) => {
+              {navGroups.map((group) => {
                 return (
                   <div key={group.label} className="mb-3">
                     {/* Group Label */}
