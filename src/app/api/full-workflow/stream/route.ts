@@ -4,6 +4,7 @@ import { generateAIText, parseAIJson, type AIImageInput } from "@/lib/ai/provide
 import { generateProductImage } from "@/lib/ai/image-generation";
 import { guard } from "@/lib/api-guard";
 import { findBlockedTerms } from "@/lib/compliance";
+import { getPolicyContextForSaleem } from "@/lib/policies";
 import {
   agentReportSchema,
   fullWorkflowResultSchema,
@@ -123,6 +124,7 @@ async function runAgent(options: {
   emit: (event: ProgressEvent) => void;
   images?: AIImageInput[];
   final?: boolean;
+  policyContext?: string;
 }) {
   const step = workflowSteps.find((item) => item.id === options.stepId);
   if (!step) throw new Error(`Unknown workflow step: ${options.stepId}`);
@@ -132,7 +134,7 @@ async function runAgent(options: {
   const previousReports = reportContext(options.reports);
   const response = await withProviderRetry(
     () => generateAIText({
-      system: `${agentInstructions(step.id)}
+      system: `${agentInstructions(step.id)}${options.policyContext ? `\n\n${options.policyContext}` : ""}
 
 You are one independent specialist in a multi-agent workflow. Do only your assigned role. Do not impersonate other agents. Do not expose hidden chain-of-thought. Return a concise professional work report containing conclusions, evidence, decisions, warnings, handoff, and structured output.`,
       prompt: `${JSON.stringify({
@@ -214,8 +216,12 @@ function blockedResult(input: ProductInput, reports: AgentReport[]): FullWorkflo
     policyStatus: { status: "blocked", riskLevel: "high", notes, blockedTerms },
     qualityReport: {
       strengths: ["The compliance gate prevented risky claims from entering production."],
-      issues: notes,
-      recommendations: ["Correct the flagged seller input and run the workflow again."],
+      issues: blockedTerms.length
+        ? blockedTerms.map((term) => `High-risk content detected: ${term}.`)
+        : notes,
+      recommendations: blockedTerms.length
+        ? blockedTerms.map((term) => `Remove or provide reliable substantiation for: ${term}.`)
+        : ["Review Saleem's report, correct the specifically flagged content, and run the workflow again."],
       hallucinationRisk: 0,
       requiresRevision: true,
       revisionTargetAgent: null,
@@ -292,6 +298,61 @@ function outputStatus(report: AgentReport) {
   return String(report.output.status ?? "").toLowerCase();
 }
 
+function hardStopReasons(input: ProductInput) {
+  const text = [
+    input.productName,
+    input.category,
+    input.description,
+    input.specifications,
+    input.notes,
+  ].join(" ");
+  const patterns = [
+    { reason: "Unsubstantiated medical treatment or prevention claim", pattern: /\b(cure[sd]?|treats?|prevents?)\b.{0,45}\b(disease|cancer|diabetes|infection|anxiety|depression)\b/i },
+    { reason: "Unverified regulatory approval claim", pattern: /\b(fda|ce)[\s-]?approved\b/i },
+    { reason: "Absolute guarantee or risk-free claim", pattern: /\b(guaranteed results?|100%\s+(safe|effective)|risk[- ]free)\b/i },
+    { reason: "Unverified ranking claim", pattern: /\b(#\s?1|number one|best seller|top[- ]rated)\b/i },
+    { reason: "Weapon or controlled substance content", pattern: /\b(firearm|gun|ammunition|explosive|controlled substance|narcotic)\b/i },
+  ];
+  return patterns.filter(({ pattern }) => pattern.test(text)).map(({ reason }) => reason);
+}
+
+function normalizeInitialGate(report: AgentReport, input: ProductInput): AgentReport {
+  if (outputStatus(report) !== "blocked") return report;
+  const hardStops = hardStopReasons(input);
+  if (hardStops.length) {
+    return {
+      ...report,
+      warnings: Array.from(new Set([...report.warnings, ...hardStops])),
+      output: {
+        ...report.output,
+        status: "blocked",
+        riskLevel: "high",
+        blockedTerms: hardStops,
+      },
+    };
+  }
+
+  return {
+    ...report,
+    summary: `${report.summary} No concrete high-risk content violation was found, so production may continue with seller review.`,
+    decisions: [
+      ...report.decisions,
+      "Marketplace category eligibility is a seller-account and catalog check, not by itself a reason to block content production.",
+    ],
+    warnings: Array.from(new Set([
+      ...report.warnings,
+      "Confirm that this product category and selling method are eligible for the seller's Amazon Egypt account before publishing.",
+    ])),
+    handoff: "Continue the workflow. Carry the marketplace eligibility warning into the final review.",
+    output: {
+      ...report.output,
+      status: "needs_review",
+      riskLevel: "medium",
+      blockedTerms: [],
+    },
+  };
+}
+
 function imagePrompts(report: AgentReport) {
   const prompts = Array.isArray(report.output.imagePrompts) ? report.output.imagePrompts : [];
   return prompts.slice(0, 2).flatMap((item) => {
@@ -341,8 +402,29 @@ export async function POST(request: NextRequest) {
           return;
         }
 
+        let policyContext = "";
+        try {
+          policyContext = await getPolicyContextForSaleem({
+            productName: input.productName,
+            description: input.description,
+            category: input.category,
+            specifications: input.specifications,
+            materials: input.materials,
+            targetAudience: input.targetAudience,
+            keywords: input.keywords,
+          });
+        } catch {
+          // Policy bank is best-effort; Saleem still runs without it.
+        }
+
         await runAgent({ stepId: "ali-intake", input, reports, emit });
-        const gate = await runAgent({ stepId: "saleem-gate", input, reports, emit }) as AgentReport;
+        const rawGate = await runAgent({ stepId: "saleem-gate", input, reports, emit, policyContext }) as AgentReport;
+        const gate = normalizeInitialGate(rawGate, input);
+        if (gate !== rawGate) {
+          const gateIndex = reports.findIndex((report) => report.stepId === "saleem-gate");
+          reports[gateIndex] = gate;
+          emit({ type: "report", report: gate });
+        }
         if (outputStatus(gate) === "blocked") {
           emit({ type: "step", stepId: "saleem-gate", status: "blocked" });
           emit({ type: "result", provider: gate.provider, model: gate.model, result: blockedResult(input, reports) });
@@ -377,7 +459,7 @@ export async function POST(request: NextRequest) {
         }
 
         await runAgent({ stepId: "badr", input, reports, emit });
-        await runAgent({ stepId: "saleem-final", input, reports, emit });
+        await runAgent({ stepId: "saleem-final", input, reports, emit, policyContext });
         const final = await runAgent({ stepId: "ali-final", input, reports, emit, final: true });
         if (!final || !("result" in final)) throw new Error("Ali did not return a final delivery.");
 

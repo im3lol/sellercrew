@@ -120,6 +120,7 @@ import {
   UsagePage as FunctionalUsagePage,
 } from './modules/workspace-pages';
 import { ProductAssets } from './modules/product-assets';
+import { PolicyBank } from './modules/policy-bank';
 
 // ─── Navigation Configuration ───────────────────────────────────────────────
 
@@ -179,6 +180,7 @@ const navGroups: NavGroup[] = [
     label: 'Admin',
     adminOnly: true,
     items: [
+      { page: 'admin-policies', label: 'Policy Bank', icon: ShieldCheck },
       { page: 'admin-users', label: 'Users', icon: Users },
       { page: 'admin-orgs', label: 'Organizations', icon: Building2 },
       { page: 'admin-subscriptions', label: 'Subscriptions', icon: Layers },
@@ -211,6 +213,7 @@ const pageTitleMap: Record<DashboardPage, string> = {
   invoices: 'Invoices',
   credits: 'Credits',
   usage: 'Usage',
+  'admin-policies': 'Policy Bank',
   'admin-users': 'Users',
   'admin-orgs': 'Organizations',
   'admin-subscriptions': 'Subscriptions',
@@ -638,6 +641,8 @@ function renderPage(page: DashboardPage) {
       return <FunctionalCreditsPage />;
     case 'usage':
       return <FunctionalUsagePage />;
+    case 'admin-policies':
+      return <PolicyBank />;
     case 'admin-users':
       return <FunctionalAdminUsersPage />;
     case 'admin-orgs':

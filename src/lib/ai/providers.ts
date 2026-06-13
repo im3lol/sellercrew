@@ -19,7 +19,7 @@ interface GenerateAITextOptions {
 }
 
 export interface AITextResult {
-  provider: "anthropic" | "gemini";
+  provider: "anthropic" | "gemini" | "openrouter";
   model: string;
   text: string;
 }
@@ -232,10 +232,68 @@ async function generateWithGemini(options: GenerateAITextOptions): Promise<AITex
   return { provider: "gemini", model, text };
 }
 
+async function generateWithOpenRouter(options: GenerateAITextOptions): Promise<AITextResult> {
+  const apiKey = process.env.OPENROUTER_API_KEY;
+  if (!apiKey) throw new Error("OpenRouter is not configured.");
+
+  const model = process.env.OPENROUTER_WORKFLOW_MODEL || "google/gemini-2.5-flash";
+  const messages = [
+    {
+      role: "system",
+      content: options.json
+        ? `${options.system}\nReturn only valid JSON with no markdown fences.`
+        : options.system,
+    },
+    ...(options.history ?? []).map((message) => ({ role: message.role, content: message.content })),
+    {
+      role: "user",
+      content: [
+        { type: "text", text: options.prompt },
+        ...(options.images ?? []).map((image) => ({
+          type: "image_url",
+          image_url: { url: image.dataUrl },
+        })),
+      ],
+    },
+  ];
+
+  const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+      "HTTP-Referer": process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000",
+      "X-Title": "SellerCrew",
+    },
+    body: JSON.stringify({
+      model,
+      messages,
+      temperature: 0.2,
+      max_tokens: options.maxTokens ?? 2_000,
+    }),
+    signal: AbortSignal.timeout(110_000),
+  });
+
+  const payload = await response.json() as {
+    model?: string;
+    choices?: Array<{ message?: { content?: string | null } }>;
+    error?: { message?: string };
+  };
+  if (!response.ok) {
+    throw new Error(payload.error?.message || `OpenRouter request failed (${response.status}).`);
+  }
+
+  const text = payload.choices?.[0]?.message?.content?.trim();
+  if (!text) throw new Error("OpenRouter returned an empty response.");
+
+  options.onTextDelta?.(text, text);
+  return { provider: "openrouter", model: payload.model || model, text };
+}
+
 export async function generateAIText(options: GenerateAITextOptions): Promise<AITextResult> {
   const errors: string[] = [];
 
-  for (const generate of [generateWithAnthropic, generateWithGemini]) {
+  for (const generate of [generateWithAnthropic, generateWithGemini, generateWithOpenRouter]) {
     try {
       return await generate(options);
     } catch (error) {

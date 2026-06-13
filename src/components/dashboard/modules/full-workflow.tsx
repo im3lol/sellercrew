@@ -908,8 +908,13 @@ export function FullWorkflow() {
                     <CardContent className="space-y-2">
                       {result.evidenceLock.map((evidence) => (
                         <div key={`${evidence.claim}-${evidence.sourceReference}`} className="rounded-lg border p-3 text-sm">
-                          <div className="flex items-start justify-between gap-2"><p className="font-medium">{evidence.claim}</p><Badge variant="outline" className="shrink-0 capitalize">{evidence.status.replace("_", " ")}</Badge></div>
+                          <div className="flex items-start justify-between gap-2"><p className="font-medium">{evidence.claim}</p><Badge variant="outline" className="shrink-0">{evidence.status === "needs_verification" ? "Verify before publishing" : evidence.status.replace("_", " ")}</Badge></div>
                           <p className="mt-1 text-xs text-gray-500">{evidence.sourceReference} · {evidence.sourceType.replace("_", " ")} · {evidence.createdByAgent}</p>
+                          {evidence.status === "needs_verification" ? (
+                            <p className="mt-2 text-xs leading-5 text-amber-700">
+                              This fact came from seller input but was not independently proven by an uploaded label, manual, certificate, or reliable source.
+                            </p>
+                          ) : null}
                         </div>
                       ))}
                     </CardContent>

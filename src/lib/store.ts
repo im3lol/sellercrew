@@ -40,7 +40,8 @@ export type DashboardPage =
   | 'admin-users'
   | 'admin-orgs'
   | 'admin-subscriptions'
-  | 'admin-analytics';
+  | 'admin-analytics'
+  | 'admin-policies';
 
 export type UserRole = 'owner' | 'admin' | 'manager' | 'member' | 'viewer';
 

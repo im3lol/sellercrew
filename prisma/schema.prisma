@@ -178,3 +178,43 @@ model ActivityLog {
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
+
+// ============================================
+// POLICY KNOWLEDGE BASE (Saleem's compliance memory)
+// Global, admin-managed. Uploaded .md policy docs are parsed into
+// structured, deduplicated rules that Saleem references at review time.
+// ============================================
+
+model PolicyDocument {
+  id           String   @id @default(cuid())
+  title        String
+  fileName     String   @map("file_name")
+  rawMarkdown  String   @map("raw_markdown")
+  status       String   @default("active") // active, archived
+  uploadedById String?  @map("uploaded_by_id")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  rules PolicyRule[]
+}
+
+model PolicyRule {
+  id            String   @id @default(cuid())
+  documentId    String   @map("document_id")
+  category      String   // health_medical_claims, restricted_prohibited_products, etc.
+  title         String
+  ruleText      String   @map("rule_text")
+  severity      String   @default("medium") // low, medium, high, critical
+  keywords      String   @default("[]")     // JSON array of strings
+  fingerprint   String                       // normalized hash for exact-duplicate detection
+  status        String   @default("active")  // active, duplicate, superseded, archived
+  duplicateOfId String?  @map("duplicate_of_id")
+  note          String?                       // why flagged (dedup/AI rationale)
+  createdAt     DateTime @default(now())
+
+  document PolicyDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@index([category])
+  @@index([status])
+  @@index([fingerprint])
+}
