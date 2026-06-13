@@ -37,11 +37,13 @@ export type DashboardPage =
   | 'invoices'
   | 'credits'
   | 'usage'
+  | 'admin-overview'
   | 'admin-users'
   | 'admin-orgs'
   | 'admin-subscriptions'
   | 'admin-analytics'
-  | 'admin-policies';
+  | 'admin-policies'
+  | 'admin-settings';
 
 export type UserRole = 'owner' | 'admin' | 'manager' | 'member' | 'viewer';
 

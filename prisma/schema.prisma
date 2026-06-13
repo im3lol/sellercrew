@@ -218,3 +218,38 @@ model PolicyRule {
   @@index([status])
   @@index([fingerprint])
 }
+
+// ============================================
+// ADMIN: SYSTEM SETTINGS & WORKFLOW METRICS
+// ============================================
+
+model SystemSetting {
+  key       String   @id
+  value     String   // JSON-encoded value
+  updatedAt DateTime @updatedAt
+}
+
+// Server-side record of each completed/blocked workflow run, for the
+// admin accuracy & system report.
+model WorkflowRun {
+  id                String   @id @default(cuid())
+  userId            String?  @map("user_id")
+  provider          String?
+  model             String?
+  status            String   @default("completed") // completed, blocked, failed
+  blocked           Boolean  @default(false)
+  policyStatus      String?  @map("policy_status")
+  overallScore      Int      @default(0) @map("overall_score")
+  qualityScore      Int      @default(0) @map("quality_score")
+  seoScore          Int      @default(0) @map("seo_score")
+  conversionScore   Int      @default(0) @map("conversion_score")
+  complianceScore   Int      @default(0) @map("compliance_score")
+  accuracyScore     Int      @default(0) @map("accuracy_score")
+  hallucinationRisk Int      @default(0) @map("hallucination_risk")
+  generatedImages   Int      @default(0) @map("generated_images")
+  durationMs        Int      @default(0) @map("duration_ms")
+  createdAt         DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([status])
+}

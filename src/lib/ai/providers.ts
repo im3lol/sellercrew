@@ -1,3 +1,5 @@
+import { getSettings } from "@/lib/settings";
+
 export interface AIImageInput {
   dataUrl: string;
   type: string;
@@ -58,11 +60,11 @@ async function readSSE(
   }
 }
 
-async function generateWithAnthropic(options: GenerateAITextOptions): Promise<AITextResult> {
+async function generateWithAnthropic(options: GenerateAITextOptions, modelOverride?: string): Promise<AITextResult> {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) throw new Error("Anthropic is not configured.");
 
-  const model = process.env.ANTHROPIC_MODEL || "claude-sonnet-4-6";
+  const model = modelOverride || process.env.ANTHROPIC_MODEL || "claude-sonnet-4-6";
   const messages = [
     ...(options.history ?? []).map((message) => ({
       role: message.role,
@@ -143,11 +145,11 @@ async function generateWithAnthropic(options: GenerateAITextOptions): Promise<AI
   return { provider: "anthropic", model, text };
 }
 
-async function generateWithGemini(options: GenerateAITextOptions): Promise<AITextResult> {
+async function generateWithGemini(options: GenerateAITextOptions, modelOverride?: string): Promise<AITextResult> {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) throw new Error("Gemini is not configured.");
 
-  const model = process.env.GEMINI_MODEL || "gemini-2.5-flash";
+  const model = modelOverride || process.env.GEMINI_MODEL || "gemini-2.5-flash";
   const contents = [
     ...(options.history ?? []).map((message) => ({
       role: message.role === "assistant" ? "model" : "user",
@@ -232,11 +234,11 @@ async function generateWithGemini(options: GenerateAITextOptions): Promise<AITex
   return { provider: "gemini", model, text };
 }
 
-async function generateWithOpenRouter(options: GenerateAITextOptions): Promise<AITextResult> {
+async function generateWithOpenRouter(options: GenerateAITextOptions, modelOverride?: string): Promise<AITextResult> {
   const apiKey = process.env.OPENROUTER_API_KEY;
   if (!apiKey) throw new Error("OpenRouter is not configured.");
 
-  const model = process.env.OPENROUTER_WORKFLOW_MODEL || "google/gemini-2.5-flash";
+  const model = modelOverride || process.env.OPENROUTER_WORKFLOW_MODEL || "google/gemini-2.5-flash";
   const messages = [
     {
       role: "system",
@@ -291,11 +293,27 @@ async function generateWithOpenRouter(options: GenerateAITextOptions): Promise<A
 }
 
 export async function generateAIText(options: GenerateAITextOptions): Promise<AITextResult> {
-  const errors: string[] = [];
+  const settings = await getSettings().catch(() => null);
+  const models = settings?.models;
+  const order = settings?.providerOrder ?? ["anthropic", "gemini", "openrouter"];
+  const fallback = settings?.features.openRouterFallback ?? true;
 
-  for (const generate of [generateWithAnthropic, generateWithGemini, generateWithOpenRouter]) {
+  const runners: Record<string, () => Promise<AITextResult>> = {
+    anthropic: () => generateWithAnthropic(options, models?.anthropic),
+    gemini: () => generateWithGemini(options, models?.gemini),
+    openrouter: () => generateWithOpenRouter(options, models?.openrouter),
+  };
+
+  let chain = order.filter((key) => key in runners);
+  if (fallback && !chain.includes("openrouter")) chain.push("openrouter");
+  if (!fallback) chain = chain.filter((key) => key !== "openrouter");
+  chain = [...new Set(chain)];
+  if (!chain.length) chain = ["anthropic", "gemini"];
+
+  const errors: string[] = [];
+  for (const key of chain) {
     try {
-      return await generate(options);
+      return await runners[key]();
     } catch (error) {
       errors.push(error instanceof Error ? error.message : "AI provider failed.");
     }

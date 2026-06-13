@@ -3,8 +3,10 @@ import { z } from "zod";
 import { generateAIText, parseAIJson, type AIImageInput } from "@/lib/ai/providers";
 import { generateProductImage } from "@/lib/ai/image-generation";
 import { guard } from "@/lib/api-guard";
-import { findBlockedTerms } from "@/lib/compliance";
+import { getBlockedTerms } from "@/lib/compliance";
 import { getPolicyContextForSaleem } from "@/lib/policies";
+import { getSettings } from "@/lib/settings";
+import { db } from "@/lib/db";
 import {
   agentReportSchema,
   fullWorkflowResultSchema,
@@ -382,23 +384,56 @@ export async function POST(request: NextRequest) {
   }
 
   const input = parsed.data;
+  const uid = access.session.uid;
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
       const emit = createEmitter(controller);
       const reports: AgentReport[] = [];
       const generatedImages: GeneratedImage[] = [];
       const references = input.uploadedImages.map((image) => ({ dataUrl: image.dataUrl, type: image.type }));
+      const startedAt = Date.now();
+
+      const recordRun = async (data: {
+        provider?: string;
+        model?: string;
+        result: FullWorkflowResult;
+        blocked: boolean;
+      }) => {
+        try {
+          await db.workflowRun.create({
+            data: {
+              userId: uid,
+              provider: data.provider ?? null,
+              model: data.model ?? null,
+              status: data.blocked ? "blocked" : "completed",
+              blocked: data.blocked,
+              policyStatus: data.result.policyStatus?.status ?? null,
+              overallScore: Math.round(data.result.scores.overallScore),
+              qualityScore: Math.round(data.result.scores.qualityScore),
+              seoScore: Math.round(data.result.scores.seoScore),
+              conversionScore: Math.round(data.result.scores.conversionScore),
+              complianceScore: Math.round(data.result.scores.complianceScore),
+              accuracyScore: Math.round(data.result.scores.accuracyScore),
+              hallucinationRisk: Math.round(data.result.qualityReport.hallucinationRisk),
+              generatedImages: data.result.generatedImages.length,
+              durationMs: Date.now() - startedAt,
+            },
+          });
+        } catch {
+          // Metrics are best-effort.
+        }
+      };
+
+      const settings = await getSettings().catch(() => null);
 
       try {
-        const blockedTerms = findBlockedTerms(input);
+        const blockedTerms = await getBlockedTerms(input);
         if (blockedTerms.length) {
           emit({ type: "step", stepId: "ali-intake", status: "completed" });
           emit({ type: "step", stepId: "saleem-gate", status: "blocked" });
-          emit({
-            type: "result",
-            provider: "sellercrew-gate",
-            result: deterministicBlockedResult(input, blockedTerms),
-          });
+          const blockedRes = deterministicBlockedResult(input, blockedTerms);
+          emit({ type: "result", provider: "sellercrew-gate", result: blockedRes });
+          await recordRun({ provider: "sellercrew-gate", result: blockedRes, blocked: true });
           return;
         }
 
@@ -427,7 +462,9 @@ export async function POST(request: NextRequest) {
         }
         if (outputStatus(gate) === "blocked") {
           emit({ type: "step", stepId: "saleem-gate", status: "blocked" });
-          emit({ type: "result", provider: gate.provider, model: gate.model, result: blockedResult(input, reports) });
+          const gateBlocked = blockedResult(input, reports);
+          emit({ type: "result", provider: gate.provider, model: gate.model, result: gateBlocked });
+          await recordRun({ provider: gate.provider, model: gate.model, result: gateBlocked, blocked: true });
           return;
         }
 
@@ -446,7 +483,7 @@ export async function POST(request: NextRequest) {
           runAgent({ stepId: "adam", input, reports, emit }),
         ]);
 
-        if (adam && "output" in adam) {
+        if (settings?.features.imageGeneration !== false && adam && "output" in adam) {
           const prompts = imagePrompts(adam);
           const images = await Promise.allSettled(
             prompts.map((item) => generateProductImage({ ...item, referenceImages: references }))
@@ -470,6 +507,7 @@ export async function POST(request: NextRequest) {
           generatedImages,
         });
         emit({ type: "result", provider: final.provider, model: final.model, result });
+        await recordRun({ provider: final.provider, model: final.model, result, blocked: false });
       } catch (error) {
         emit({
           type: "error",
