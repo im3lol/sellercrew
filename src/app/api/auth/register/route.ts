@@ -40,11 +40,19 @@ export async function POST(request: NextRequest) {
 
   const starterCredits = SUBSCRIPTION_PLANS.starter.credits;
 
+  // The very first account to register becomes the global admin.
+  const isFirstUser = (await db.user.count()) === 0;
+
   let userId: string;
   try {
     userId = await db.$transaction(async (tx) => {
       const user = await tx.user.create({
-        data: { email, name, passwordHash: hashPassword(password) },
+        data: {
+          email,
+          name,
+          passwordHash: hashPassword(password),
+          role: isFirstUser ? "admin" : "user",
+        },
       });
       const org = await tx.organization.create({
         data: { name: `${name}'s Workspace`, ownerId: user.id },

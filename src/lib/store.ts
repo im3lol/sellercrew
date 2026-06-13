@@ -5,7 +5,7 @@ import { useDashboardStore } from '@/lib/dashboard-store';
 export type AppView = 'landing' | 'auth' | 'dashboard';
 
 export interface AccountPayload {
-  user: { id: string; email: string; name: string; avatar: string | null };
+  user: { id: string; email: string; name: string; avatar: string | null; role?: string };
   workspace: {
     id: string;
     name: string;
@@ -72,6 +72,7 @@ interface AppState {
     email: string;
     name: string;
     avatar: string | null;
+    role?: string;
   } | null;
 
   // Workspace

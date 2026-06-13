@@ -53,11 +53,11 @@ export async function requireAdmin(request: NextRequest): Promise<GuardResult> {
     };
   }
 
-  const membership = await db.organizationMember.findFirst({
-    where: { userId: session.uid, role: { in: ["owner", "admin"] } },
-    select: { id: true },
+  const user = await db.user.findUnique({
+    where: { id: session.uid },
+    select: { role: true },
   });
-  if (!membership) {
+  if (user?.role !== "admin") {
     return {
       ok: false,
       response: NextResponse.json({ error: "Admin access is required." }, { status: 403 }),

@@ -9,7 +9,7 @@ export interface AccountWorkspace {
 }
 
 export interface AccountContext {
-  user: { id: string; email: string; name: string; avatar: string | null };
+  user: { id: string; email: string; name: string; avatar: string | null; role: string };
   workspace: AccountWorkspace | null;
 }
 
@@ -35,6 +35,7 @@ export async function loadAccount(userId: string): Promise<AccountContext | null
       email: user.email,
       name: user.name ?? user.email,
       avatar: user.avatar ?? null,
+      role: user.role,
     },
     workspace: org
       ? {

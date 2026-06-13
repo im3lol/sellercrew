@@ -151,6 +151,7 @@ const navGroups: NavGroup[] = [
   },
   {
     label: 'Standalone Tools',
+    adminOnly: true,
     items: [
       { page: 'listing-analyzer', label: 'Listing Review', icon: FileSearch },
       { page: 'research-report', label: 'Product Research', icon: Search },
@@ -163,6 +164,7 @@ const navGroups: NavGroup[] = [
   },
   {
     label: 'Team',
+    adminOnly: true,
     items: [
       { page: 'agents', label: 'AI Agents', icon: Bot },
       { page: 'agent-performance', label: 'Performance', icon: TrendingUp },
@@ -171,6 +173,7 @@ const navGroups: NavGroup[] = [
   },
   {
     label: 'Billing',
+    adminOnly: true,
     items: [
       { page: 'plans', label: 'Plans & Credits', icon: CreditCard },
       { page: 'usage', label: 'Usage', icon: Activity },
@@ -741,8 +744,11 @@ export function DashboardV2() {
     toast.success(`${workspace.name} workspace created.`);
   };
 
-  const isAdmin =
-    activeWorkspace?.role === 'owner' || activeWorkspace?.role === 'admin';
+  const isAdmin = user?.role === 'admin';
+
+  // Regular users may only reach non-admin pages; block direct/persisted access.
+  const adminOnlyPage = navGroups.find((group) => group.items.some((item) => item.page === dashboardPage))?.adminOnly;
+  const effectivePage: DashboardPage = !isAdmin && adminOnlyPage ? 'home' : dashboardPage;
 
   const sidebarWidth = sidebarOpen ? 260 : 64;
 
@@ -1194,8 +1200,8 @@ export function DashboardV2() {
 
           {/* ── Page Content ─────────────────────────────────────────── */}
           <main className="min-w-0 flex-1 overscroll-contain overflow-x-hidden overflow-y-auto p-4 md:p-6">
-            <div key={dashboardPage} className="min-w-0">
-              {renderPage(dashboardPage)}
+            <div key={effectivePage} className="min-w-0">
+              {renderPage(effectivePage)}
             </div>
           </main>
         </div>
