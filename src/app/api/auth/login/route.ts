@@ -13,7 +13,7 @@ const schema = z.object({
 });
 
 export async function POST(request: NextRequest) {
-  const limited = rateLimit(`login:${clientIp(request)}`, 20, 15 * 60 * 1000);
+  const limited = await rateLimit(`login:${clientIp(request)}`, 20, 15 * 60 * 1000);
   if (!limited.ok) {
     return NextResponse.json(
       { error: `Too many sign-in attempts. Try again in ${limited.retryAfterSeconds} seconds.` },
@@ -29,7 +29,7 @@ export async function POST(request: NextRequest) {
   const { email, password } = parsed.data;
 
   // Per-account limit so a single target can't be brute-forced from rotating IPs.
-  const perAccount = rateLimit(`login:acct:${email}`, 10, 15 * 60 * 1000);
+  const perAccount = await rateLimit(`login:acct:${email}`, 10, 15 * 60 * 1000);
   if (!perAccount.ok) {
     return NextResponse.json(
       { error: `Too many sign-in attempts. Try again in ${perAccount.retryAfterSeconds} seconds.` },

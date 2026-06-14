@@ -69,7 +69,7 @@ export async function POST(request: NextRequest) {
   const access = await requireAdmin(request);
   if (!access.ok) return access.response;
 
-  const limited = rateLimit(`test-provider:${access.session.email}`, 20, 60 * 1000);
+  const limited = await rateLimit(`test-provider:${access.session.email}`, 20, 60 * 1000);
   if (!limited.ok) {
     return NextResponse.json({ error: `Slow down. Try again in ${limited.retryAfterSeconds}s.` }, { status: 429 });
   }

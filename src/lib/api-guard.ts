@@ -46,7 +46,7 @@ export async function guard(request: NextRequest, options: GuardOptions): Promis
     };
   }
 
-  const result = rateLimit(`${options.scope}:${session.uid}`, options.limit, options.windowMs);
+  const result = await rateLimit(`${options.scope}:${session.uid}`, options.limit, options.windowMs);
   if (!result.ok) {
     return {
       ok: false,

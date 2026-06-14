@@ -1,16 +1,27 @@
 # SellerCrew — Open Architectural Decisions — 2026-06-14
 
-These three findings from the review are **deliberately not changed in code yet**
-because each is a real trade-off / needs coordination or a product call. Changing
-them blindly would risk the stability the rest of the work secured. Each has a
-concrete recommendation and exact steps so they can be done intentionally.
+These were the three findings that needed a trade-off, coordination, or a product
+call rather than a mechanical fix. **All three are now resolved** (D1 Redis rate
+limiter, D2 migrations baseline, D3 dead-model removal); each section keeps its
+original analysis plus a RESOLVED note. The only remaining follow-up is for the
+Codex-owned Docker setup to switch its DB init from `db push` to `migrate deploy`
+(see D2).
 
-Everything else from the review has been fixed (see
+Everything else from the review was already fixed (see
 [`CLAUDE_WORK_AUDIT_2026-06-14.md`](./CLAUDE_WORK_AUDIT_2026-06-14.md) §5).
 
 ---
 
-## D1. Multi-instance rate limiting (Redis-backed)
+## D1. Multi-instance rate limiting (Redis-backed) — RESOLVED
+
+> **Done (2026-06-14):** `src/lib/rate-limit.ts` is now async with a Redis backend
+> (atomic `INCR`+`PEXPIRE`) used when `REDIS_URL` is set in the environment, plus a
+> transparent in-memory fallback on any Redis error so auth is never blocked. It
+> reads `REDIS_URL` from the env (not the admin DB secret) to keep the auth hot path
+> off the database. Single instance with no `REDIS_URL` behaves exactly as before.
+> All call sites + tests updated to `await`.
+
+### (original analysis)
 
 **State:** `src/lib/rate-limit.ts` is an in-memory fixed window. Correct for a
 single instance (current local/Docker deployment); on Vercel or multiple replicas
@@ -33,7 +44,16 @@ it does not today.
 
 ---
 
-## D2. Prisma migrations instead of `db push`
+## D2. Prisma migrations instead of `db push` — RESOLVED (baseline)
+
+> **Done (2026-06-14):** baselined to migrations. `prisma/migrations/0_init/` holds
+> the full schema; the existing DB was marked applied (`migrate resolve --applied
+> 0_init` → "Database schema is up to date"). Added `db:deploy`
+> (`prisma migrate deploy`). **Follow-up for Codex:** switch the `docker-compose`
+> init step from `prisma db push` to `prisma migrate deploy` so deploys use the
+> committed history.
+
+### (original analysis)
 
 **State:** schema is applied with `prisma db push` (dev + `docker-compose` init).
 No `prisma/migrations/` history → no review/rollback of schema changes.
