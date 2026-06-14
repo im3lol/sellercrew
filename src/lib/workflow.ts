@@ -1,4 +1,4 @@
-import { z } from "zod";
+import * as z from "zod";
 
 export const workflowAgentIds = [
   "ali-intake",
@@ -26,7 +26,7 @@ export const workflowSteps = [
   { id: "bayan", agentId: "bayan", label: "Bayan", task: "Listing and A+ copywriting" },
   { id: "nadeem", agentId: "nadeem", label: "Nadeem", task: "SEO optimization" },
   { id: "rayan", agentId: "rayan", label: "Rayan", task: "Creative direction and image concepts" },
-  { id: "adam", agentId: "adam", label: "Adam", task: "Production-ready image prompts" },
+  { id: "adam", agentId: "adam", label: "Adam", task: "Sequential image production" },
   { id: "badr", agentId: "badr", label: "Badr", task: "Accuracy and quality review" },
   { id: "saleem-final", agentId: "saleem", label: "Saleem", task: "Final policy and claims review" },
   { id: "ali-final", agentId: "ali", label: "Ali", task: "Final approval and delivery" },
@@ -61,12 +61,19 @@ const workflowStepStatusAliases: Record<string, WorkflowStepStatus> = {
 
 // AI providers occasionally return step statuses outside the allowed set
 // (e.g. "working", "pending"). Coerce them instead of failing the whole run.
-const workflowStepStatusSchema = z.preprocess((value) => {
-  if (typeof value !== "string") return value;
+export function coerceWorkflowStepStatus(value: unknown): WorkflowStepStatus {
+  if (typeof value !== "string") return "completed";
   const normalized = value.trim().toLowerCase().replace(/[\s-]+/g, "_");
-  if ((workflowStepStatuses as readonly string[]).includes(normalized)) return normalized;
+  if ((workflowStepStatuses as readonly string[]).includes(normalized)) {
+    return normalized as WorkflowStepStatus;
+  }
   return workflowStepStatusAliases[normalized] ?? "completed";
-}, z.enum(workflowStepStatuses));
+}
+
+const workflowStepStatusSchema = z.preprocess(
+  (value) => coerceWorkflowStepStatus(value),
+  z.enum(workflowStepStatuses)
+);
 
 const uploadedImageSchema = z.object({
   name: z.string().trim().min(1).max(200),

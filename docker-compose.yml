@@ -1,30 +1,117 @@
+name: sellercrew
+
+x-app-environment: &app-environment
+  NODE_ENV: production
+  NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-http://localhost:3000}
+  DATABASE_URL: ${DOCKER_DATABASE_URL:-postgresql://sellercrew:sellercrew@postgres:5432/sellercrew?schema=public}
+  DIRECT_URL: ${DOCKER_DIRECT_URL:-postgresql://sellercrew:sellercrew@postgres:5432/sellercrew?schema=public}
+  REDIS_URL: ${DOCKER_REDIS_URL:-redis://redis:6379}
+  SESSION_SECRET: ${SESSION_SECRET:-sellercrew-local-session-secret-change-before-production}
+  ADMIN_SESSION_SECRET: ${ADMIN_SESSION_SECRET:-sellercrew-local-admin-session-secret-change-before-production}
+  ADMIN_EMAIL: ${ADMIN_EMAIL:-}
+  ADMIN_PASSWORD_HASH_B64: ${ADMIN_PASSWORD_HASH_B64:-}
+  NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY:-}
+  CLERK_SECRET_KEY: ${CLERK_SECRET_KEY:-}
+  GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+  GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+  GOOGLE_DRIVE_TOKEN_ENCRYPTION_KEY: ${GOOGLE_DRIVE_TOKEN_ENCRYPTION_KEY:-}
+  ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+  ANTHROPIC_MODEL: ${ANTHROPIC_MODEL:-claude-sonnet-4-6}
+  GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+  GEMINI_MODEL: ${GEMINI_MODEL:-gemini-2.5-flash}
+  OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+  OPENAI_WORKFLOW_MODEL: ${OPENAI_WORKFLOW_MODEL:-gpt-5.4-mini}
+  OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+  OPENROUTER_WORKFLOW_MODEL: ${OPENROUTER_WORKFLOW_MODEL:-qwen/qwen3.7-plus}
+  OPENROUTER_IMAGE_MODEL: ${OPENROUTER_IMAGE_MODEL:-google/gemini-2.5-flash-image}
+  TRUSTED_PROXY_COUNT: ${TRUSTED_PROXY_COUNT:-1}
+
 services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: sellercrew
+      POSTGRES_USER: sellercrew
+      POSTGRES_PASSWORD: sellercrew
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sellercrew -d sellercrew"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+  migrate:
+    build:
+      context: .
+      target: worker
+    image: sellercrew-worker:latest
+    command: ["bunx", "prisma", "db", "push", "--skip-generate"]
+    environment: *app-environment
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
   app:
     build:
       context: .
+      target: web
       args:
         NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY:-}
         NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-http://localhost:3000}
-    image: sellercrew:latest
-    env_file:
-      - .env
-      - .env.local
+    image: sellercrew-web:latest
     environment:
-      NODE_ENV: production
+      <<: *app-environment
       HOSTNAME: 0.0.0.0
       PORT: "3000"
     ports:
-      - "3000:3000"
+      - "${APP_PORT:-3000}:3000"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
     restart: unless-stopped
 
   worker:
-    image: sellercrew:latest
-    command: ["bun", "src/worker.ts"]
-    env_file:
-      - .env
-      - .env.local
-    environment:
-      NODE_ENV: production
+    build:
+      context: .
+      target: worker
+    image: sellercrew-worker:latest
+    environment: *app-environment
     depends_on:
-      - app
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "bun",
+          "-e",
+          "import Redis from 'ioredis';const r=new Redis(process.env.REDIS_URL);if(await r.ping()!=='PONG')process.exit(1);await r.quit()",
+        ]
+      interval: 15s
+      timeout: 5s
+      start_period: 20s
+      retries: 5
     restart: unless-stopped
+
+volumes:
+  postgres_data:
+  redis_data:

@@ -1,10 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getSession, type SessionPayload } from "@/lib/auth";
+import { getAdminSession, getSession, type AdminSessionPayload, type SessionPayload } from "@/lib/auth";
 import { rateLimit } from "@/lib/rate-limit";
 import { db } from "@/lib/db";
 
 export type GuardResult =
   | { ok: true; session: SessionPayload }
+  | { ok: false; response: NextResponse };
+
+export type AdminGuardResult =
+  | { ok: true; session: AdminSessionPayload }
   | { ok: false; response: NextResponse };
 
 interface GuardOptions {
@@ -17,12 +21,23 @@ interface GuardOptions {
  * Require an authenticated session and apply a per-user rate limit.
  * Returns either the verified session or a ready-to-send error response.
  */
-export function guard(request: NextRequest, options: GuardOptions): GuardResult {
+export async function guard(request: NextRequest, options: GuardOptions): Promise<GuardResult> {
   const session = getSession(request);
   if (!session) {
     return {
       ok: false,
       response: NextResponse.json({ error: "Please sign in to continue." }, { status: 401 }),
+    };
+  }
+
+  const user = await db.user.findUnique({
+    where: { id: session.uid },
+    select: { accountStatus: true },
+  });
+  if (user?.accountStatus !== "active") {
+    return {
+      ok: false,
+      response: NextResponse.json({ error: "This account is suspended." }, { status: 403 }),
     };
   }
 
@@ -41,28 +56,16 @@ export function guard(request: NextRequest, options: GuardOptions): GuardResult 
 }
 
 /**
- * Require an authenticated session that is an owner/admin of at least one
- * organization. Used to gate the global policy knowledge base management APIs.
+ * Require an authenticated session with the global platform admin role.
+ * Workspace ownership alone does not grant access to platform administration.
  */
-export async function requireAdmin(request: NextRequest): Promise<GuardResult> {
-  const session = getSession(request);
+export async function requireAdmin(request: NextRequest): Promise<AdminGuardResult> {
+  const session = getAdminSession(request);
   if (!session) {
     return {
       ok: false,
-      response: NextResponse.json({ error: "Please sign in to continue." }, { status: 401 }),
+      response: NextResponse.json({ error: "Admin sign-in is required." }, { status: 401 }),
     };
   }
-
-  const user = await db.user.findUnique({
-    where: { id: session.uid },
-    select: { role: true },
-  });
-  if (user?.role !== "admin") {
-    return {
-      ok: false,
-      response: NextResponse.json({ error: "Admin access is required." }, { status: 403 }),
-    };
-  }
-
   return { ok: true, session };
 }

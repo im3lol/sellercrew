@@ -1,5 +1,19 @@
 import { db } from "@/lib/db";
 
+export const DEFAULT_OPENROUTER_TEXT_MODELS = [
+  "qwen/qwen3.7-plus",
+  "z-ai/glm-5.1",
+  "minimax/minimax-m3",
+  "openrouter/owl-alpha",
+] as const;
+
+export const DEFAULT_OPENROUTER_IMAGE_MODELS = [
+  "google/gemini-2.5-flash-image",
+  "google/gemini-3.1-flash-image-preview",
+  "bytedance-seed/seedream-4.5",
+  "openai/gpt-5.4-image-2",
+] as const;
+
 export interface AppSettings {
   models: {
     anthropic: string;
@@ -7,6 +21,8 @@ export interface AppSettings {
     openrouter: string;
     openai: string;
     geminiImage: string;
+    openrouterTextFallbacks: string[];
+    openrouterImageFallbacks: string[];
   };
   providerOrder: Array<"anthropic" | "gemini" | "openrouter">;
   features: {
@@ -33,11 +49,13 @@ function defaults(): AppSettings {
     models: {
       anthropic: process.env.ANTHROPIC_MODEL || "claude-sonnet-4-6",
       gemini: process.env.GEMINI_MODEL || "gemini-2.5-flash",
-      openrouter: process.env.OPENROUTER_WORKFLOW_MODEL || "google/gemini-2.5-flash",
+      openrouter: process.env.OPENROUTER_WORKFLOW_MODEL || DEFAULT_OPENROUTER_TEXT_MODELS[0],
       openai: process.env.OPENAI_WORKFLOW_MODEL || "gpt-5.4-mini",
-      geminiImage: process.env.GEMINI_IMAGE_MODEL || "gemini-3.1-flash-image",
+      geminiImage: process.env.OPENROUTER_IMAGE_MODEL || DEFAULT_OPENROUTER_IMAGE_MODELS[0],
+      openrouterTextFallbacks: DEFAULT_OPENROUTER_TEXT_MODELS.slice(1),
+      openrouterImageFallbacks: DEFAULT_OPENROUTER_IMAGE_MODELS.slice(1),
     },
-    providerOrder: ["anthropic", "gemini", "openrouter"],
+    providerOrder: ["openrouter", "anthropic", "gemini"],
     features: {
       openRouterFallback: true,
       imageGeneration: true,
@@ -48,7 +66,7 @@ function defaults(): AppSettings {
   };
 }
 
-function merge(base: AppSettings, stored: SettingsPatch | null): AppSettings {
+export function mergeSettings(base: AppSettings, stored: SettingsPatch | null): AppSettings {
   if (!stored) return base;
   return {
     models: { ...base.models, ...(stored.models ?? {}) },
@@ -79,14 +97,14 @@ export async function getSettings(): Promise<AppSettings> {
     stored = null;
   }
 
-  const data = merge(defaults(), stored);
+  const data = mergeSettings(defaults(), stored);
   cache = { data, ts: now };
   return data;
 }
 
 export async function updateSettings(patch: SettingsPatch): Promise<AppSettings> {
   const current = await getSettings();
-  const next = merge(current, patch);
+  const next = mergeSettings(current, patch);
   await db.systemSetting.upsert({
     where: { key: SETTINGS_KEY },
     create: { key: SETTINGS_KEY, value: JSON.stringify(next) },

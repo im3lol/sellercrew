@@ -2,139 +2,149 @@
 
 import { useState } from 'react';
 import {
+  BarChart3,
+  Building2,
+  ChevronRight,
+  CreditCard,
   LayoutDashboard,
-  ShieldCheck,
-  Settings,
-  Bot,
-  FileSearch,
-  Target,
-  TrendingUp,
-  Eye,
   LogOut,
-  ArrowLeft,
   Menu,
+  Settings,
+  ShieldCheck,
+  Users,
+  X,
 } from 'lucide-react';
-import { useAppStore } from '@/lib/store';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Badge } from '@/components/ui/badge';
 import { AdminOverview } from '@/components/dashboard/modules/admin-overview';
 import { PolicyBank } from '@/components/dashboard/modules/policy-bank';
 import { AdminSettings } from '@/components/dashboard/modules/admin-settings';
-import { AgentsView } from '@/components/dashboard/modules/agents-view';
-import { ListingAnalyzer } from '@/components/dashboard/modules/listing-analyzer';
-import { CompetitorAnalyzer } from '@/components/dashboard/modules/competitor-analyzer';
-import { KeywordCenter } from '@/components/dashboard/modules/keyword-center';
-import { ImageBriefGenerator } from '@/components/dashboard/modules/image-brief-generator';
+import {
+  AdminAnalytics,
+  AdminOrganizations,
+  AdminSubscriptions,
+  AdminUsers,
+} from '@/components/admin/admin-management';
 
-type AdminPage =
-  | 'overview'
-  | 'policies'
-  | 'settings'
-  | 'agents'
-  | 'listing-review'
-  | 'competitors'
-  | 'keywords'
-  | 'images';
+type AdminPage = 'overview' | 'users' | 'organizations' | 'subscriptions' | 'analytics' | 'policies' | 'settings';
 
 const NAV: { label: string; items: { id: AdminPage; label: string; icon: React.ElementType }[] }[] = [
   {
-    label: 'System',
+    label: 'Platform',
     items: [
-      { id: 'overview', label: 'System Status', icon: LayoutDashboard },
-      { id: 'policies', label: 'Policy Bank', icon: ShieldCheck },
-      { id: 'settings', label: 'Settings & API', icon: Settings },
+      { id: 'overview', label: 'Overview', icon: LayoutDashboard },
+      { id: 'users', label: 'Users', icon: Users },
+      { id: 'organizations', label: 'Workspaces', icon: Building2 },
+      { id: 'subscriptions', label: 'Subscriptions', icon: CreditCard },
+      { id: 'analytics', label: 'Reports & analytics', icon: BarChart3 },
     ],
   },
   {
-    label: 'Workspace Tools',
+    label: 'Governance',
     items: [
-      { id: 'agents', label: 'AI Agents', icon: Bot },
-      { id: 'listing-review', label: 'Listing Review', icon: FileSearch },
-      { id: 'competitors', label: 'Market & Competitors', icon: Target },
-      { id: 'keywords', label: 'Keywords & SEO', icon: TrendingUp },
-      { id: 'images', label: 'Images & A+ Content', icon: Eye },
+      { id: 'policies', label: 'Policy knowledge', icon: ShieldCheck },
+      { id: 'settings', label: 'AI & system settings', icon: Settings },
     ],
   },
 ];
 
-const TITLES: Record<AdminPage, string> = {
-  overview: 'System Status & Report',
-  policies: 'Policy Knowledge Base',
-  settings: 'Settings & API',
-  agents: 'AI Agents',
-  'listing-review': 'Listing Review',
-  competitors: 'Market & Competitors',
-  keywords: 'Keywords & SEO',
-  images: 'Images & A+ Content',
+const TITLES: Record<AdminPage, { title: string; description: string }> = {
+  overview: { title: 'Admin overview', description: 'Platform health and operating status' },
+  users: { title: 'Users', description: 'Platform accounts and access levels' },
+  organizations: { title: 'Workspaces', description: 'Seller organizations and ownership' },
+  subscriptions: { title: 'Subscriptions', description: 'Plans, status, and credit usage' },
+  analytics: { title: 'Reports & analytics', description: 'Workflow quality and platform activity' },
+  policies: { title: 'Policy knowledge', description: 'Saleem compliance rules and sources' },
+  settings: { title: 'AI & system settings', description: 'Providers, models, and workflow controls' },
 };
 
 function renderPage(page: AdminPage) {
   switch (page) {
-    case 'overview':
-      return <AdminOverview />;
+    case 'users':
+      return <AdminUsers />;
+    case 'organizations':
+      return <AdminOrganizations />;
+    case 'subscriptions':
+      return <AdminSubscriptions />;
+    case 'analytics':
+      return <AdminAnalytics />;
     case 'policies':
       return <PolicyBank />;
     case 'settings':
       return <AdminSettings />;
-    case 'agents':
-      return <AgentsView />;
-    case 'listing-review':
-      return <ListingAnalyzer />;
-    case 'competitors':
-      return <CompetitorAnalyzer />;
-    case 'keywords':
-      return <KeywordCenter />;
-    case 'images':
-      return <ImageBriefGenerator />;
     default:
       return <AdminOverview />;
   }
 }
 
-export function AdminDashboard() {
-  const user = useAppStore((s) => s.user);
+export function AdminDashboard({ adminEmail, onSignedOut }: { adminEmail: string; onSignedOut: () => void }) {
   const [page, setPage] = useState<AdminPage>('overview');
   const [mobileOpen, setMobileOpen] = useState(false);
-
-  const logout = () => {
-    useAppStore.getState().logout();
-    window.location.href = '/';
+  const meta = TITLES[page];
+  const logout = async () => {
+    await fetch('/api/admin/auth/logout', { method: 'POST', credentials: 'include' }).catch(() => null);
+    onSignedOut();
   };
 
   return (
-    <div className="flex h-dvh w-full overflow-hidden bg-[#F8F9FB]">
-      {/* Sidebar */}
+    <div className="flex h-dvh w-full overflow-hidden bg-[#F8F9FB] text-[#0B0F1A]">
       <aside
-        className={`${mobileOpen ? 'fixed inset-y-0 left-0 z-40 flex' : 'hidden'} w-64 shrink-0 flex-col bg-[#0B0F1A] text-white md:flex`}
+        className={`${mobileOpen ? 'fixed inset-y-0 left-0 z-40 flex' : 'hidden'} w-[272px] shrink-0 flex-col border-r border-slate-200 bg-white md:flex`}
       >
-        <div className="flex items-center gap-2 px-5 py-5">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-[#035EF9] to-[#7E44E6] text-sm font-bold">
-            S
+        <div className="flex h-[70px] items-center justify-between border-b border-slate-100 px-4">
+          <div className="flex min-w-0 items-center gap-3">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-gradient-to-br from-[#035EF9] via-[#7E44E6] to-[#FC7403] p-1 shadow-sm shadow-[#7E44E6]/20">
+              <div className="h-full w-full overflow-hidden rounded-[9px] bg-white">
+                <img src="/agents/ali.png" alt="SellerCrew" className="h-full w-full object-cover" />
+              </div>
+            </div>
+            <div className="min-w-0">
+              <p className="truncate text-xl font-extrabold tracking-[-0.055em] text-[#07101f]">sellercrew</p>
+              <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#7E44E6]">Admin console</p>
+            </div>
           </div>
-          <div>
-            <p className="text-sm font-semibold leading-tight">SellerCrew</p>
-            <p className="text-[10px] uppercase tracking-wider text-white/40">Admin Console</p>
-          </div>
+          <button
+            type="button"
+            aria-label="Close navigation"
+            className="rounded-lg p-2 text-slate-400 hover:bg-slate-100 md:hidden"
+            onClick={() => setMobileOpen(false)}
+          >
+            <X className="h-5 w-5" />
+          </button>
         </div>
 
-        <nav className="flex-1 space-y-4 overflow-y-auto px-3 py-2">
+        <div className="mx-4 mt-4 rounded-xl border border-[#7E44E6]/15 bg-gradient-to-br from-[#035EF9]/5 to-[#7E44E6]/8 p-3">
+          <div className="flex items-center gap-2">
+            <ShieldCheck className="h-4 w-4 text-[#7E44E6]" />
+            <p className="text-xs font-bold text-slate-800">Restricted administration</p>
+          </div>
+          <p className="mt-1 text-[11px] leading-4 text-slate-500">Platform data, policies, providers, and system reports.</p>
+        </div>
+
+        <nav className="flex-1 space-y-5 overflow-y-auto px-3 py-5">
           {NAV.map((group) => (
             <div key={group.label}>
-              <p className="px-3 pb-1 text-[10px] font-semibold uppercase tracking-wider text-white/30">{group.label}</p>
-              <div className="space-y-0.5">
+              <p className="px-3 pb-2 text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">{group.label}</p>
+              <div className="space-y-1">
                 {group.items.map((item) => {
                   const active = page === item.id;
                   return (
                     <button
                       key={item.id}
+                      type="button"
                       onClick={() => {
                         setPage(item.id);
                         setMobileOpen(false);
                       }}
-                      className={`flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition-colors ${
-                        active ? 'bg-white/10 text-white' : 'text-white/60 hover:bg-white/5 hover:text-white'
+                      className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-medium transition-colors ${
+                        active
+                          ? 'bg-[#035EF9]/10 text-[#035EF9]'
+                          : 'text-slate-600 hover:bg-slate-50 hover:text-slate-950'
                       }`}
                     >
-                      <item.icon className="h-4 w-4" />
-                      {item.label}
+                      <item.icon className="h-[18px] w-[18px] shrink-0" />
+                      <span className="flex-1">{item.label}</span>
+                      {active && <span className="h-1.5 w-1.5 rounded-full bg-[#035EF9]" />}
                     </button>
                   );
                 })}
@@ -143,40 +153,64 @@ export function AdminDashboard() {
           ))}
         </nav>
 
-        <div className="border-t border-white/10 p-3">
-          <a
-            href="/"
-            className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-white/60 transition-colors hover:bg-white/5 hover:text-white"
-          >
-            <ArrowLeft className="h-4 w-4" /> Back to app
-          </a>
+        <div className="border-t border-slate-100 p-3">
           <button
+            type="button"
             onClick={logout}
-            className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-white/60 transition-colors hover:bg-white/5 hover:text-white"
+            className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-red-600 hover:bg-red-50"
           >
-            <LogOut className="h-4 w-4" /> Sign out
+            <LogOut className="h-[18px] w-[18px]" /> Sign out
           </button>
         </div>
       </aside>
 
-      {mobileOpen && <div className="fixed inset-0 z-30 bg-black/40 md:hidden" onClick={() => setMobileOpen(false)} />}
+      {mobileOpen && (
+        <button
+          type="button"
+          aria-label="Close navigation overlay"
+          className="fixed inset-0 z-30 bg-black/35 md:hidden"
+          onClick={() => setMobileOpen(false)}
+        />
+      )}
 
-      {/* Main */}
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="flex items-center justify-between border-b border-slate-200 bg-white px-4 py-3 md:px-6">
-          <div className="flex items-center gap-2">
-            <button className="md:hidden" onClick={() => setMobileOpen(true)}>
-              <Menu className="h-5 w-5 text-slate-500" />
+        <header className="flex h-[70px] shrink-0 items-center justify-between border-b border-slate-200 bg-white px-4 md:px-6">
+          <div className="flex min-w-0 items-center gap-3">
+            <button
+              type="button"
+              aria-label="Open navigation"
+              className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 md:hidden"
+              onClick={() => setMobileOpen(true)}
+            >
+              <Menu className="h-5 w-5" />
             </button>
-            <h1 className="text-base font-semibold text-slate-900">{TITLES[page]}</h1>
+            <div className="min-w-0">
+              <div className="flex items-center gap-1.5 text-[11px] font-medium text-slate-400">
+                <span>Administration</span>
+                <ChevronRight className="h-3 w-3" />
+                <span className="truncate text-slate-600">{meta.title}</span>
+              </div>
+              <p className="truncate text-sm font-bold text-slate-950">{meta.description}</p>
+            </div>
           </div>
+
           <div className="flex items-center gap-3">
-            <span className="hidden text-sm text-slate-500 sm:block">{user?.email}</span>
-            <span className="rounded-full bg-[#0B0F1A] px-2.5 py-1 text-[11px] font-medium text-white">Admin</span>
+            <Badge variant="outline" className="hidden border-[#7E44E6]/20 bg-[#7E44E6]/5 text-[#6D35D4] sm:inline-flex">
+              Admin only
+            </Badge>
+            <div className="hidden text-right lg:block">
+              <p className="text-sm font-semibold leading-tight text-slate-900">SellerCrew Admin</p>
+              <p className="text-[11px] text-slate-400">{adminEmail}</p>
+            </div>
+            <Avatar className="h-9 w-9 border border-slate-200">
+              <AvatarFallback className="bg-[#0B0F1A] text-xs font-bold text-white">AD</AvatarFallback>
+            </Avatar>
           </div>
         </header>
 
-        <main className="min-w-0 flex-1 overflow-y-auto p-4 md:p-6">{renderPage(page)}</main>
+        <main className="min-w-0 flex-1 overflow-y-auto p-4 md:p-6 lg:p-8">
+          <div className="mx-auto w-full max-w-[1440px]">{renderPage(page)}</div>
+        </main>
       </div>
     </div>
   );

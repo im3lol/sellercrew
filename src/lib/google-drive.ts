@@ -1,6 +1,10 @@
 import crypto from "crypto";
-import { google, type drive_v3, type sheets_v4 } from "googleapis";
 import { db } from "@/lib/db";
+
+// Google Drive + Sheets integration implemented with direct REST calls.
+// We deliberately avoid the `googleapis` SDK: it pulls in hundreds of generated
+// API clients (tens of MB), which bloats the bundle/standalone output and slows
+// builds. The handful of endpoints we need are simple HTTPS calls.
 
 export const GOOGLE_DRIVE_SCOPES = [
   "openid",
@@ -10,8 +14,19 @@ export const GOOGLE_DRIVE_SCOPES = [
   "https://www.googleapis.com/auth/spreadsheets",
 ];
 
+const TOKEN_URL = "https://oauth2.googleapis.com/token";
+const AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth";
+const USERINFO_URL = "https://www.googleapis.com/oauth2/v2/userinfo";
+const DRIVE_FILES_URL = "https://www.googleapis.com/drive/v3/files";
+const DRIVE_UPLOAD_URL = "https://www.googleapis.com/upload/drive/v3/files";
+const SHEETS_URL = "https://sheets.googleapis.com/v4/spreadsheets";
+
 function appUrl() {
   return (process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000").replace(/\/$/, "");
+}
+
+function redirectUri() {
+  return `${appUrl()}/api/google-drive/callback`;
 }
 
 const GOOGLE_DRIVE_OAUTH_SETTING_KEY = "google_drive_oauth";
@@ -61,21 +76,15 @@ export async function saveGoogleDriveOAuthConfig(clientId: string, clientSecret?
   const secret = clientSecret || current?.clientSecret;
   if (!secret) throw new Error("Google Client Secret is required.");
 
+  const value = JSON.stringify({
+    clientId,
+    encryptedClientSecret: encryptGoogleToken(secret),
+  } satisfies StoredGoogleDriveOAuth);
+
   await db.systemSetting.upsert({
     where: { key: GOOGLE_DRIVE_OAUTH_SETTING_KEY },
-    create: {
-      key: GOOGLE_DRIVE_OAUTH_SETTING_KEY,
-      value: JSON.stringify({
-        clientId,
-        encryptedClientSecret: encryptGoogleToken(secret),
-      } satisfies StoredGoogleDriveOAuth),
-    },
-    update: {
-      value: JSON.stringify({
-        clientId,
-        encryptedClientSecret: encryptGoogleToken(secret),
-      } satisfies StoredGoogleDriveOAuth),
-    },
+    create: { key: GOOGLE_DRIVE_OAUTH_SETTING_KEY, value },
+    update: { value },
   });
 }
 
@@ -87,15 +96,17 @@ export async function googleDriveConfigured() {
   return Boolean(await getGoogleDriveOAuthConfig());
 }
 
-export async function createGoogleOAuthClient() {
+async function requireConfig(): Promise<GoogleDriveOAuthConfig> {
   const config = await getGoogleDriveOAuthConfig();
   if (!config) throw new Error("Google Drive OAuth is not configured.");
-  return new google.auth.OAuth2(
-    config.clientId,
-    config.clientSecret,
-    `${appUrl()}/api/google-drive/callback`
-  );
+  return config;
 }
+
+// ---------------------------------------------------------------------------
+// Token encryption (AES-256-GCM). Also used by src/lib/secrets.ts. The key is
+// derived from a dedicated secret, falling back to SESSION_SECRET — keep these
+// stable across environments or previously-stored secrets won't decrypt.
+// ---------------------------------------------------------------------------
 
 function encryptionKey() {
   const secret =
@@ -122,6 +133,10 @@ export function decryptGoogleToken(value: string) {
   decipher.setAuthTag(Buffer.from(tag, "base64url"));
   return Buffer.concat([decipher.update(Buffer.from(encrypted, "base64url")), decipher.final()]).toString("utf8");
 }
+
+// ---------------------------------------------------------------------------
+// OAuth state (signed, short-lived) — CSRF protection for the connect flow.
+// ---------------------------------------------------------------------------
 
 function stateSecret() {
   return process.env.SESSION_SECRET || "sellercrew-insecure-dev-secret-change-me";
@@ -153,78 +168,198 @@ export function verifyGoogleOAuthState(state: string | null | undefined, userId:
   }
 }
 
-export async function getGoogleServices(userId: string) {
+// ---------------------------------------------------------------------------
+// OAuth: build consent URL, exchange code, fetch profile, refresh access token.
+// ---------------------------------------------------------------------------
+
+export async function buildGoogleAuthUrl(state: string, loginHint?: string) {
+  const config = await requireConfig();
+  const params = new URLSearchParams({
+    client_id: config.clientId,
+    redirect_uri: redirectUri(),
+    response_type: "code",
+    access_type: "offline",
+    prompt: "consent",
+    include_granted_scopes: "true",
+    scope: GOOGLE_DRIVE_SCOPES.join(" "),
+    state,
+  });
+  if (loginHint) params.set("login_hint", loginHint);
+  return `${AUTH_URL}?${params.toString()}`;
+}
+
+export interface GoogleTokenResponse {
+  access_token: string;
+  refresh_token?: string;
+  scope?: string;
+  expires_in?: number;
+  token_type?: string;
+}
+
+export async function exchangeCodeForTokens(code: string): Promise<GoogleTokenResponse> {
+  const config = await requireConfig();
+  const res = await fetch(TOKEN_URL, {
+    method: "POST",
+    headers: { "content-type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      code,
+      client_id: config.clientId,
+      client_secret: config.clientSecret,
+      redirect_uri: redirectUri(),
+      grant_type: "authorization_code",
+    }),
+  });
+  if (!res.ok) throw new Error("Google token exchange failed.");
+  return (await res.json()) as GoogleTokenResponse;
+}
+
+export async function getGoogleUserInfo(accessToken: string): Promise<{ email?: string }> {
+  const res = await fetch(USERINFO_URL, { headers: { Authorization: `Bearer ${accessToken}` } });
+  if (!res.ok) return {};
+  return (await res.json()) as { email?: string };
+}
+
+async function refreshAccessToken(refreshToken: string): Promise<string> {
+  const config = await requireConfig();
+  const res = await fetch(TOKEN_URL, {
+    method: "POST",
+    headers: { "content-type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      client_id: config.clientId,
+      client_secret: config.clientSecret,
+      refresh_token: refreshToken,
+      grant_type: "refresh_token",
+    }),
+  });
+  if (!res.ok) throw new Error("Stored Google token is invalid.");
+  const data = (await res.json()) as GoogleTokenResponse;
+  if (!data.access_token) throw new Error("Stored Google token is invalid.");
+  return data.access_token;
+}
+
+async function getAccessToken(userId: string) {
   const connection = await db.googleDriveConnection.findUnique({ where: { userId } });
   if (!connection) throw new Error("Google Drive is not connected.");
-  const auth = await createGoogleOAuthClient();
-  auth.setCredentials({ refresh_token: decryptGoogleToken(connection.encryptedRefreshToken) });
-  return {
-    connection,
-    drive: google.drive({ version: "v3", auth }),
-    sheets: google.sheets({ version: "v4", auth }),
-  };
+  const accessToken = await refreshAccessToken(decryptGoogleToken(connection.encryptedRefreshToken));
+  return { accessToken, connection };
 }
 
-async function findFolder(drive: drive_v3.Drive, name: string, parentId?: string | null) {
+// ---------------------------------------------------------------------------
+// Thin REST helper. Throws a compact error; callers genericize before returning.
+// ---------------------------------------------------------------------------
+
+async function googleFetch(url: string, accessToken: string, init: RequestInit = {}) {
+  const res = await fetch(url, {
+    ...init,
+    headers: { Authorization: `Bearer ${accessToken}`, ...(init.headers || {}) },
+  });
+  if (!res.ok) {
+    const detail = await res.text().catch(() => "");
+    throw new Error(`Google API ${res.status}: ${detail.slice(0, 300)}`);
+  }
+  if (res.status === 204) return null;
+  return res.json();
+}
+
+export interface DriveFile {
+  id?: string;
+  name?: string;
+  webViewLink?: string;
+  modifiedTime?: string;
+  parents?: string[];
+}
+
+async function listAllFiles(accessToken: string, mimeType: string, fields: string): Promise<DriveFile[]> {
+  const files: DriveFile[] = [];
+  let pageToken: string | undefined;
+  do {
+    const params = new URLSearchParams({
+      q: `mimeType='${mimeType}' and trashed=false`,
+      orderBy: "modifiedTime desc",
+      pageSize: "100",
+      fields: `nextPageToken,files(${fields})`,
+    });
+    if (pageToken) params.set("pageToken", pageToken);
+    const data = await googleFetch(`${DRIVE_FILES_URL}?${params.toString()}`, accessToken);
+    files.push(...((data?.files ?? []) as DriveFile[]));
+    pageToken = data?.nextPageToken ?? undefined;
+  } while (pageToken && files.length < 500);
+  return files;
+}
+
+export async function listDriveFolders(userId: string): Promise<DriveFile[]> {
+  const { accessToken } = await getAccessToken(userId);
+  return listAllFiles(accessToken, "application/vnd.google-apps.folder", "id,name,modifiedTime,webViewLink,parents");
+}
+
+export async function listSpreadsheets(userId: string): Promise<DriveFile[]> {
+  const { accessToken } = await getAccessToken(userId);
+  return listAllFiles(
+    accessToken,
+    "application/vnd.google-apps.spreadsheet",
+    "id,name,modifiedTime,webViewLink,owners(displayName,emailAddress)"
+  );
+}
+
+async function findFolder(accessToken: string, name: string, parentId?: string | null): Promise<DriveFile | null> {
   const escapedName = name.replace(/'/g, "\\'");
   const parentQuery = parentId ? ` and '${parentId}' in parents` : "";
-  const response = await drive.files.list({
+  const params = new URLSearchParams({
     q: `name='${escapedName}' and mimeType='application/vnd.google-apps.folder' and trashed=false${parentQuery}`,
     fields: "files(id,name,webViewLink)",
-    pageSize: 10,
+    pageSize: "10",
   });
-  return response.data.files?.[0] ?? null;
+  const data = await googleFetch(`${DRIVE_FILES_URL}?${params.toString()}`, accessToken);
+  return (data?.files?.[0] as DriveFile) ?? null;
 }
 
-async function ensureFolder(drive: drive_v3.Drive, name: string, parentId?: string | null) {
-  const existing = await findFolder(drive, name, parentId);
+async function ensureFolder(accessToken: string, name: string, parentId?: string | null): Promise<DriveFile> {
+  const existing = await findFolder(accessToken, name, parentId);
   if (existing?.id) return existing;
-  const created = await drive.files.create({
-    requestBody: {
+  const params = new URLSearchParams({ fields: "id,name,webViewLink" });
+  const created = (await googleFetch(`${DRIVE_FILES_URL}?${params.toString()}`, accessToken, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
       name,
       mimeType: "application/vnd.google-apps.folder",
       ...(parentId ? { parents: [parentId] } : {}),
-    },
-    fields: "id,name,webViewLink",
-  });
-  if (!created.data.id) throw new Error(`Could not create the ${name} folder.`);
-  return created.data;
+    }),
+  })) as DriveFile;
+  if (!created?.id) throw new Error(`Could not create the ${name} folder.`);
+  return created;
 }
 
-async function ensureSpreadsheet(
-  drive: drive_v3.Drive,
-  sheets: sheets_v4.Sheets,
-  title: string,
-  existingId?: string | null
-) {
+async function ensureSpreadsheet(accessToken: string, title: string, existingId?: string | null): Promise<string> {
   if (existingId) return existingId;
   const escapedTitle = title.replace(/'/g, "\\'");
-  const existing = await drive.files.list({
+  const params = new URLSearchParams({
     q: `name='${escapedTitle}' and mimeType='application/vnd.google-apps.spreadsheet' and trashed=false`,
     fields: "files(id,name)",
-    pageSize: 10,
+    pageSize: "10",
   });
-  if (existing.data.files?.[0]?.id) return existing.data.files[0].id;
-  const created = await sheets.spreadsheets.create({
-    requestBody: { properties: { title } },
-    fields: "spreadsheetId,spreadsheetUrl",
+  const existing = await googleFetch(`${DRIVE_FILES_URL}?${params.toString()}`, accessToken);
+  if (existing?.files?.[0]?.id) return existing.files[0].id as string;
+  const created = await googleFetch(`${SHEETS_URL}?fields=spreadsheetId,spreadsheetUrl`, accessToken, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ properties: { title } }),
   });
-  if (!created.data.spreadsheetId) throw new Error("Could not create the Google Sheet.");
-  return created.data.spreadsheetId;
+  if (!created?.spreadsheetId) throw new Error("Could not create the Google Sheet.");
+  return created.spreadsheetId as string;
 }
 
-async function ensureSheetHeader(sheets: sheets_v4.Sheets, spreadsheetId: string) {
+async function ensureSheetHeader(accessToken: string, spreadsheetId: string) {
   const header = [
     "Synced at", "Workspace", "Product", "Brand", "Marketplace", "Category", "Status",
     "Title", "Bullet points", "Description", "Keywords", "Compliance score", "Images folder",
   ];
-  const current = await sheets.spreadsheets.values.get({ spreadsheetId, range: "A1:M1" });
-  if (current.data.values?.length) return;
-  await sheets.spreadsheets.values.update({
-    spreadsheetId,
-    range: "A1:M1",
-    valueInputOption: "RAW",
-    requestBody: { values: [header] },
+  const current = await googleFetch(`${SHEETS_URL}/${spreadsheetId}/values/A1:M1`, accessToken);
+  if (current?.values?.length) return;
+  await googleFetch(`${SHEETS_URL}/${spreadsheetId}/values/A1:M1?valueInputOption=RAW`, accessToken, {
+    method: "PUT",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ values: [header] }),
   });
 }
 
@@ -241,22 +376,33 @@ export interface UploadedImageLink {
 }
 
 async function uploadImage(
-  drive: drive_v3.Drive,
+  accessToken: string,
   folderId: string,
   image: { name: string; dataUrl: string }
 ): Promise<UploadedImageLink> {
   const { mimeType, bytes } = dataUrlParts(image.dataUrl);
-  const { Readable } = await import("stream");
-  const created = await drive.files.create({
-    requestBody: { name: image.name, parents: [folderId] },
-    media: { mimeType, body: Readable.from(bytes) },
-    fields: "id,name,webViewLink",
-  });
-  const fileId = created.data.id ?? "";
+  const boundary = `scrw${crypto.randomBytes(12).toString("hex")}`;
+  const metadata = JSON.stringify({ name: image.name, parents: [folderId] });
+  const preamble = Buffer.from(
+    `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${metadata}\r\n` +
+      `--${boundary}\r\nContent-Type: ${mimeType}\r\n\r\n`,
+    "utf8"
+  );
+  const epilogue = Buffer.from(`\r\n--${boundary}--\r\n`, "utf8");
+  const body = Buffer.concat([preamble, bytes, epilogue]);
+
+  const params = new URLSearchParams({ uploadType: "multipart", fields: "id,name,webViewLink" });
+  const created = (await googleFetch(`${DRIVE_UPLOAD_URL}?${params.toString()}`, accessToken, {
+    method: "POST",
+    headers: { "content-type": `multipart/related; boundary=${boundary}` },
+    body,
+  })) as DriveFile;
+
+  const fileId = created?.id ?? "";
   return {
-    name: created.data.name ?? image.name,
+    name: created?.name ?? image.name,
     fileId,
-    webViewLink: created.data.webViewLink ?? (fileId ? `https://drive.google.com/file/d/${fileId}/view` : ""),
+    webViewLink: created?.webViewLink ?? (fileId ? `https://drive.google.com/file/d/${fileId}/view` : ""),
   };
 }
 
@@ -279,7 +425,7 @@ export interface GoogleProductSyncPayload {
 }
 
 export async function syncProductToGoogle(userId: string, payload: GoogleProductSyncPayload) {
-  const { drive, sheets } = await getGoogleServices(userId);
+  const { accessToken } = await getAccessToken(userId);
   const settings = await db.googleDriveSettings.upsert({
     where: { organizationId: payload.workspaceId },
     create: { organizationId: payload.workspaceId },
@@ -291,7 +437,7 @@ export async function syncProductToGoogle(userId: string, payload: GoogleProduct
     ? { id: settings.selectedFolderId }
     : settings.rootFolderId
     ? { id: settings.rootFolderId }
-    : await ensureFolder(drive, "SellerCrew");
+    : await ensureFolder(accessToken, "SellerCrew");
   if (!root.id) throw new Error("Google Drive root folder is unavailable.");
 
   let productParentId = root.id;
@@ -299,56 +445,57 @@ export async function syncProductToGoogle(userId: string, payload: GoogleProduct
   if (settings.imageFolderMode === "workspace") {
     const workspaceFolder = workspaceFolderId
       ? { id: workspaceFolderId }
-      : await ensureFolder(drive, payload.workspaceName, root.id);
+      : await ensureFolder(accessToken, payload.workspaceName, root.id);
     workspaceFolderId = workspaceFolder.id ?? null;
     if (!workspaceFolderId) throw new Error("Workspace folder is unavailable.");
     productParentId = workspaceFolderId;
   }
 
-  const productsFolder = await ensureFolder(drive, "Products", productParentId);
-  const productFolder = await ensureFolder(drive, payload.productName, productsFolder.id);
+  const productsFolder = await ensureFolder(accessToken, "Products", productParentId);
+  const productFolder = await ensureFolder(accessToken, payload.productName, productsFolder.id);
   if (!productFolder.id) throw new Error("Product folder is unavailable.");
-  const customerFolder = await ensureFolder(drive, "Customer uploads", productFolder.id);
-  const generatedFolder = await ensureFolder(drive, "SellerCrew generated", productFolder.id);
+  const customerFolder = await ensureFolder(accessToken, "Customer uploads", productFolder.id);
+  const generatedFolder = await ensureFolder(accessToken, "SellerCrew generated", productFolder.id);
   if (!customerFolder.id || !generatedFolder.id) throw new Error("Product image folders are unavailable.");
 
   const [customerUploads, generatedUploads] = await Promise.all([
-    Promise.all(payload.customerImages.map((image) => uploadImage(drive, customerFolder.id!, image))),
-    Promise.all(payload.generatedImages.map((image) => uploadImage(drive, generatedFolder.id!, image))),
+    Promise.all(payload.customerImages.map((image) => uploadImage(accessToken, customerFolder.id!, image))),
+    Promise.all(payload.generatedImages.map((image) => uploadImage(accessToken, generatedFolder.id!, image))),
   ]);
 
   const sheetId = await ensureSpreadsheet(
-    drive,
-    sheets,
+    accessToken,
     settings.sheetMode === "workspace"
       ? `${payload.workspaceName} - SellerCrew Products`
       : "SellerCrew Products",
     settings.selectedSpreadsheetId || settings.workspaceSheetId
   );
-  await ensureSheetHeader(sheets, sheetId);
-  await sheets.spreadsheets.values.append({
-    spreadsheetId: sheetId,
-    range: "A:M",
-    valueInputOption: "USER_ENTERED",
-    insertDataOption: "INSERT_ROWS",
-    requestBody: {
-      values: [[
-        new Date().toISOString(),
-        payload.workspaceName,
-        payload.productName,
-        payload.brandName,
-        payload.marketplace,
-        payload.category,
-        payload.status,
-        payload.title,
-        payload.bullets.join("\n"),
-        payload.description,
-        payload.keywords.join(", "),
-        payload.complianceScore,
-        `https://drive.google.com/drive/folders/${productFolder.id}`,
-      ]],
-    },
-  });
+  await ensureSheetHeader(accessToken, sheetId);
+  await googleFetch(
+    `${SHEETS_URL}/${sheetId}/values/A:M:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`,
+    accessToken,
+    {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        values: [[
+          new Date().toISOString(),
+          payload.workspaceName,
+          payload.productName,
+          payload.brandName,
+          payload.marketplace,
+          payload.category,
+          payload.status,
+          payload.title,
+          payload.bullets.join("\n"),
+          payload.description,
+          payload.keywords.join(", "),
+          payload.complianceScore,
+          `https://drive.google.com/drive/folders/${productFolder.id}`,
+        ]],
+      }),
+    }
+  );
 
   await db.googleDriveSettings.update({
     where: { organizationId: payload.workspaceId },

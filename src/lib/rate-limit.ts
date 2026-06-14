@@ -19,9 +19,25 @@ function sweep(now: number) {
   }
 }
 
+// `x-forwarded-for` is "client, proxy1, proxy2, ...". The leftmost entry is
+// client-controlled and trivially spoofable on a direct-to-Node deployment, so an
+// attacker could rotate it to dodge rate limits. We instead trust only the hop our
+// own infra appends: with TRUSTED_PROXY_COUNT=n, the real client is the (n+1)-th
+// entry from the right. Default 1 matches Vercel/typical single-proxy setups.
+function trustedProxyCount(): number {
+  const n = Number.parseInt(process.env.TRUSTED_PROXY_COUNT ?? "1", 10);
+  return Number.isFinite(n) && n >= 0 ? n : 1;
+}
+
 export function clientIp(request: NextRequest): string {
   const forwarded = request.headers.get("x-forwarded-for");
-  if (forwarded) return forwarded.split(",")[0].trim();
+  if (forwarded) {
+    const hops = forwarded.split(",").map((h) => h.trim()).filter(Boolean);
+    if (hops.length) {
+      const idx = Math.max(0, hops.length - 1 - trustedProxyCount());
+      return hops[idx];
+    }
+  }
   return request.headers.get("x-real-ip")?.trim() || "unknown";
 }
 

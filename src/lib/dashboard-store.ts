@@ -117,6 +117,15 @@ function stripRunImages(runs: StoredWorkflowRun[] | undefined): StoredWorkflowRu
   );
 }
 
+// Once an asset is backed up to Google Drive, its base64 preview is redundant in
+// localStorage — drop it (keep driveUrl + metadata) so the persisted blob stays
+// small. Assets not yet backed up keep their dataUrl so the preview survives a reload.
+function stripAssetImages(assets: DashboardAsset[] | undefined): DashboardAsset[] {
+  return (assets ?? []).map((asset) =>
+    asset.driveUrl && asset.dataUrl ? { ...asset, dataUrl: undefined } : asset
+  );
+}
+
 export const useDashboardStore = create<DashboardDataState>()(
   persist(
     (set, get) => ({
@@ -430,7 +439,7 @@ export const useDashboardStore = create<DashboardDataState>()(
         workspaceId: state.workspaceId,
         projects: state.projects,
         listings: state.listings,
-        assets: state.assets,
+        assets: stripAssetImages(state.assets),
         activities: state.activities,
         workflowRuns: stripRunImages(state.workflowRuns),
         selectedProjectId: state.selectedProjectId,

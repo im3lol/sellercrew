@@ -105,11 +105,24 @@ export async function POST(request: NextRequest) {
     score: complianceScore ?? 0,
     status: status || "generated",
   };
-  const listing = await db.listing.upsert({
-    where: { id: id ?? "" },
-    update: data,
-    create: { ...(id ? { id } : {}), ...data },
-  });
+
+  // Don't upsert on the bare global id: a caller could otherwise pass a victim's
+  // listing id with their own projectId and re-parent/overwrite it. Only update a
+  // listing whose project we own; otherwise create.
+  if (id) {
+    const owned = await db.listing.findFirst({
+      where: { id, project: { organizationId: ctx.organizationId } },
+      select: { id: true },
+    });
+    if (owned) {
+      const listing = await db.listing.update({ where: { id }, data });
+      return NextResponse.json({ listing: toDashboardListing(listing) }, { status: 200 });
+    }
+    const taken = await db.listing.findUnique({ where: { id }, select: { id: true } });
+    if (taken) return NextResponse.json({ error: "Listing not found." }, { status: 404 });
+  }
+
+  const listing = await db.listing.create({ data: { ...(id ? { id } : {}), ...data } });
   return NextResponse.json({ listing: toDashboardListing(listing) }, { status: 201 });
 }
 

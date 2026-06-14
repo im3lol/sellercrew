@@ -1,6 +1,8 @@
 'use client';
 
 import { useEffect, useState, type CSSProperties } from 'react';
+import dynamic from 'next/dynamic';
+import { useShallow } from 'zustand/react/shallow';
 import { useAppStore, type DashboardPage } from '@/lib/store';
 import { agents } from '@/lib/agents';
 import { Button } from '@/components/ui/button';
@@ -91,38 +93,42 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
-// ─── Existing Module Imports ────────────────────────────────────────────────
+// ─── Module Imports ─────────────────────────────────────────────────────────
+// Only the default Home page is eager. Every other page is code-split with
+// next/dynamic so navigating to it loads its chunk on demand — this keeps the
+// initial dashboard bundle small instead of shipping all ~20 pages up front.
 import { DashboardHome } from './modules/dashboard-home';
-import { ListingBuilder } from './modules/listing-builder';
-import { ListingAnalyzer } from './modules/listing-analyzer';
-import { CompetitorAnalyzer } from './modules/competitor-analyzer';
-import { KeywordCenter } from './modules/keyword-center';
-import { ImageBriefGenerator } from './modules/image-brief-generator';
-import { AgentsView } from './modules/agents-view';
-import { ProjectsView } from './modules/projects-view';
-import { ProjectDetail } from './modules/project-detail';
-import { FullWorkflow } from './modules/full-workflow';
-import {
-  AdminAnalyticsPage as FunctionalAdminAnalyticsPage,
-  AdminOrgsPage as FunctionalAdminOrgsPage,
-  AdminSubscriptionsPage as FunctionalAdminSubscriptionsPage,
-  AdminUsersPage as FunctionalAdminUsersPage,
-  AgentHistoryPage as FunctionalAgentHistoryPage,
-  AgentPerformancePage as FunctionalAgentPerformancePage,
-  BillingPage as FunctionalBillingPage,
-  CreditsPage as FunctionalCreditsPage,
-  InvoicesPage as FunctionalInvoicesPage,
-  ListingsPage as FunctionalListingsPage,
-  PlansPage as FunctionalPlansPage,
-  ResearchReportPage as FunctionalResearchReportPage,
-  ComplianceCheckPage as FunctionalComplianceCheckPage,
-  ListingScorePage as FunctionalListingScorePage,
-  UsagePage as FunctionalUsagePage,
-} from './modules/workspace-pages';
-import { ProductAssets } from './modules/product-assets';
-import { PolicyBank } from './modules/policy-bank';
-import { AdminOverview } from './modules/admin-overview';
-import { AdminSettings } from './modules/admin-settings';
+import { ClerkLogoutMenuItem } from '@/components/auth/clerk-logout-menu-item';
+
+function PageSpinner() {
+  return (
+    <div className="flex h-64 w-full items-center justify-center">
+      <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+    </div>
+  );
+}
+
+const ListingAnalyzer = dynamic(() => import('./modules/listing-analyzer').then((m) => m.ListingAnalyzer), { loading: PageSpinner });
+const CompetitorAnalyzer = dynamic(() => import('./modules/competitor-analyzer').then((m) => m.CompetitorAnalyzer), { loading: PageSpinner });
+const KeywordCenter = dynamic(() => import('./modules/keyword-center').then((m) => m.KeywordCenter), { loading: PageSpinner });
+const ImageBriefGenerator = dynamic(() => import('./modules/image-brief-generator').then((m) => m.ImageBriefGenerator), { loading: PageSpinner });
+const AgentsView = dynamic(() => import('./modules/agents-view').then((m) => m.AgentsView), { loading: PageSpinner });
+const ProjectsView = dynamic(() => import('./modules/projects-view').then((m) => m.ProjectsView), { loading: PageSpinner });
+const ProjectDetail = dynamic(() => import('./modules/project-detail').then((m) => m.ProjectDetail), { loading: PageSpinner });
+const FullWorkflow = dynamic(() => import('./modules/full-workflow').then((m) => m.FullWorkflow), { loading: PageSpinner });
+const ProductAssets = dynamic(() => import('./modules/product-assets').then((m) => m.ProductAssets), { loading: PageSpinner });
+const AccountSettingsPage = dynamic(() => import('./modules/account-settings').then((m) => m.AccountSettingsPage), { loading: PageSpinner });
+const FunctionalAgentHistoryPage = dynamic(() => import('./modules/workspace-pages').then((m) => m.AgentHistoryPage), { loading: PageSpinner });
+const FunctionalAgentPerformancePage = dynamic(() => import('./modules/workspace-pages').then((m) => m.AgentPerformancePage), { loading: PageSpinner });
+const FunctionalBillingPage = dynamic(() => import('./modules/workspace-pages').then((m) => m.BillingPage), { loading: PageSpinner });
+const FunctionalCreditsPage = dynamic(() => import('./modules/workspace-pages').then((m) => m.CreditsPage), { loading: PageSpinner });
+const FunctionalInvoicesPage = dynamic(() => import('./modules/workspace-pages').then((m) => m.InvoicesPage), { loading: PageSpinner });
+const FunctionalListingsPage = dynamic(() => import('./modules/workspace-pages').then((m) => m.ListingsPage), { loading: PageSpinner });
+const FunctionalPlansPage = dynamic(() => import('./modules/workspace-pages').then((m) => m.PlansPage), { loading: PageSpinner });
+const FunctionalResearchReportPage = dynamic(() => import('./modules/workspace-pages').then((m) => m.ResearchReportPage), { loading: PageSpinner });
+const FunctionalComplianceCheckPage = dynamic(() => import('./modules/workspace-pages').then((m) => m.ComplianceCheckPage), { loading: PageSpinner });
+const FunctionalListingScorePage = dynamic(() => import('./modules/workspace-pages').then((m) => m.ListingScorePage), { loading: PageSpinner });
+const FunctionalUsagePage = dynamic(() => import('./modules/workspace-pages').then((m) => m.UsagePage), { loading: PageSpinner });
 
 // ─── Navigation Configuration ───────────────────────────────────────────────
 
@@ -136,6 +142,7 @@ interface NavGroup {
   label: string;
   items: NavItem[];
   adminOnly?: boolean;
+  collapsible?: boolean;
 }
 
 const navGroups: NavGroup[] = [
@@ -151,6 +158,7 @@ const navGroups: NavGroup[] = [
   },
   {
     label: 'Standalone Tools',
+    collapsible: true,
     items: [
       { page: 'listing-analyzer', label: 'Listing Review', icon: FileSearch },
       { page: 'research-report', label: 'Product Research', icon: Search },
@@ -167,15 +175,6 @@ const navGroups: NavGroup[] = [
       { page: 'agents', label: 'AI Agents', icon: Bot },
       { page: 'agent-performance', label: 'Performance', icon: TrendingUp },
       { page: 'agent-history', label: 'History', icon: Clock },
-    ],
-  },
-  {
-    label: 'Billing',
-    items: [
-      { page: 'plans', label: 'Plans & Credits', icon: CreditCard },
-      { page: 'usage', label: 'Usage', icon: Activity },
-      { page: 'invoices', label: 'Invoices', icon: Receipt },
-      { page: 'credits', label: 'Credit History', icon: Zap },
     ],
   },
 ];
@@ -199,6 +198,7 @@ const pageTitleMap: Record<DashboardPage, string> = {
   agents: 'AI Agents',
   'agent-performance': 'Agent Performance',
   'agent-history': 'Agent History',
+  'account-settings': 'Account Settings',
   billing: 'Billing',
   plans: 'Plans & Credits',
   invoices: 'Invoices',
@@ -520,74 +520,6 @@ function UsagePage() {
   );
 }
 
-function AdminUsersPage() {
-  return (
-    <PlaceholderPage
-      title="Users"
-      description="Manage team members, roles, and permissions across your organization."
-      icon={Users}
-      accentColor="#035EF9"
-      mockItems={[
-        { label: 'Ahmed Al-Rashid', value: 'Owner', status: 'active' },
-        { label: 'Sara Chen', value: 'Admin', status: 'active' },
-        { label: 'Omar Hassan', value: 'Manager', status: 'active' },
-        { label: 'Lisa Park', value: 'Member', status: 'pending' },
-        { label: 'David Kim', value: 'Viewer', status: 'active' },
-      ]}
-    />
-  );
-}
-
-function AdminOrgsPage() {
-  return (
-    <PlaceholderPage
-      title="Organizations"
-      description="Manage organizations, settings, and workspace configurations."
-      icon={Building2}
-      accentColor="#7E44E6"
-      mockItems={[
-        { label: 'SellerCrew Inc.', value: '12 members', status: 'active' },
-        { label: 'Gulf Trading Co.', value: '8 members', status: 'active' },
-        { label: 'Tech Ventures LLC', value: '3 members', status: 'pending' },
-      ]}
-    />
-  );
-}
-
-function AdminSubscriptionsPage() {
-  return (
-    <PlaceholderPage
-      title="Subscriptions"
-      description="View and manage all organization subscription plans."
-      icon={Layers}
-      accentColor="#FC7403"
-      mockItems={[
-        { label: 'SellerCrew Inc.', value: 'Enterprise', status: 'active' },
-        { label: 'Gulf Trading Co.', value: 'Professional', status: 'active' },
-        { label: 'Tech Ventures LLC', value: 'Starter', status: 'pending' },
-      ]}
-    />
-  );
-}
-
-function AdminAnalyticsPage() {
-  return (
-    <PlaceholderPage
-      title="Analytics"
-      description="Platform-wide analytics, usage metrics, and performance insights."
-      icon={BarChart2}
-      accentColor="#3EC9D1"
-      mockItems={[
-        { label: 'Total Users', value: '1,247' },
-        { label: 'Active Organizations', value: '89', status: 'active' },
-        { label: 'Credits Consumed (MTD)', value: '142,500' },
-        { label: 'Avg. Session Duration', value: '24 min' },
-        { label: 'Agent Runs (MTD)', value: '8,432', status: 'active' },
-      ]}
-    />
-  );
-}
-
 // ─── Page Renderer ──────────────────────────────────────────────────────────
 
 function renderPage(page: DashboardPage) {
@@ -624,6 +556,8 @@ function renderPage(page: DashboardPage) {
       return <FunctionalAgentPerformancePage />;
     case 'agent-history':
       return <FunctionalAgentHistoryPage />;
+    case 'account-settings':
+      return <AccountSettingsPage />;
     case 'billing':
       return <FunctionalBillingPage />;
     case 'plans':
@@ -634,20 +568,6 @@ function renderPage(page: DashboardPage) {
       return <FunctionalCreditsPage />;
     case 'usage':
       return <FunctionalUsagePage />;
-    case 'admin-overview':
-      return <AdminOverview />;
-    case 'admin-settings':
-      return <AdminSettings />;
-    case 'admin-policies':
-      return <PolicyBank />;
-    case 'admin-users':
-      return <FunctionalAdminUsersPage />;
-    case 'admin-orgs':
-      return <FunctionalAdminOrgsPage />;
-    case 'admin-subscriptions':
-      return <FunctionalAdminSubscriptionsPage />;
-    case 'admin-analytics':
-      return <FunctionalAdminAnalyticsPage />;
     default:
       return <DashboardHome />;
   }
@@ -656,6 +576,9 @@ function renderPage(page: DashboardPage) {
 // ─── Breadcrumb Helper ──────────────────────────────────────────────────────
 
 function getBreadcrumb(page: DashboardPage): { group: string; page: string } {
+  if (page === 'account-settings') {
+    return { group: 'Account', page: 'Settings' };
+  }
   for (const group of navGroups) {
     const found = group.items.find((item) => item.page === page);
     if (found) {
@@ -681,9 +604,25 @@ export function DashboardV2() {
     setActiveWorkspace,
     createWorkspace,
     setView,
-  } = useAppStore();
+  } = useAppStore(
+    useShallow((s) => ({
+      dashboardPage: s.dashboardPage,
+      setDashboardPage: s.setDashboardPage,
+      sidebarOpen: s.sidebarOpen,
+      setSidebarOpen: s.setSidebarOpen,
+      user: s.user,
+      logout: s.logout,
+      workspaces: s.workspaces,
+      activeWorkspace: s.activeWorkspace,
+      setWorkspaces: s.setWorkspaces,
+      setActiveWorkspace: s.setActiveWorkspace,
+      createWorkspace: s.createWorkspace,
+      setView: s.setView,
+    }))
+  );
   const switchDashboardWorkspace = useDashboardStore((state) => state.switchWorkspace);
   const creditsBalance = useDashboardStore((state) => state.creditsBalance);
+  const currentPlan = useDashboardStore((state) => state.plan);
   const setSelectedProject = useDashboardStore((state) => state.setSelectedProject);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -691,6 +630,7 @@ export function DashboardV2() {
   const [workspaceName, setWorkspaceName] = useState('');
   const [workspacePurpose, setWorkspacePurpose] = useState<'account' | 'category'>('account');
   const [workspaceLabel, setWorkspaceLabel] = useState('');
+  const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     if (activeWorkspace) return;
@@ -729,8 +669,6 @@ export function DashboardV2() {
     toast.success(`${workspace.name} workspace created.`);
   };
 
-  const isAdmin = user?.role === 'admin';
-
   // Admin pages live only in the separate /admin dashboard; if one is somehow
   // selected here (e.g. persisted state), fall back to Home.
   const adminPages = new Set<DashboardPage>([
@@ -762,7 +700,7 @@ export function DashboardV2() {
           style={{ width: sidebarWidth }}
         >
           {/* Logo */}
-          <div className="flex h-16 shrink-0 items-center border-b border-gray-100 px-3">
+          <div className="relative flex h-16 shrink-0 items-center border-b border-gray-100 px-3">
             <div className="flex items-center gap-2.5 min-w-0">
               <div className="flex size-10 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-gradient-to-br from-[#035EF9] via-[#7E44E6] to-[#FC7403] p-1 shadow-sm shadow-[#7E44E6]/20">
                 <div className="size-full overflow-hidden rounded-[9px] bg-white">
@@ -783,6 +721,21 @@ export function DashboardV2() {
                 )}
               </AnimatePresence>
             </div>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  aria-label={sidebarOpen ? 'Collapse sidebar' : 'Expand sidebar'}
+                  onClick={() => setSidebarOpen(!sidebarOpen)}
+                  className="absolute right-1.5 top-1.5 flex h-6 w-6 items-center justify-center rounded-md border border-gray-200 bg-white text-gray-400 shadow-sm transition-colors hover:border-gray-300 hover:bg-gray-50 hover:text-gray-700"
+                >
+                  {sidebarOpen ? <ChevronLeft className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="right" sideOffset={8}>
+                {sidebarOpen ? 'Collapse sidebar' : 'Expand sidebar'}
+              </TooltipContent>
+            </Tooltip>
           </div>
 
           {/* Workspace Switcher */}
@@ -872,24 +825,54 @@ export function DashboardV2() {
           <ScrollArea className="min-h-0 flex-1 py-2">
             <nav className="px-2 space-y-1">
               {navGroups.map((group) => {
+                const groupCollapsed = Boolean(group.collapsible && collapsedGroups[group.label]);
                 return (
                   <div key={group.label} className="mb-3">
                     {/* Group Label */}
                     <AnimatePresence>
                       {sidebarOpen && (
-                        <motion.p
-                          className="text-[10px] font-semibold uppercase tracking-wider text-gray-400 px-3 mb-1.5"
+                        <motion.div
                           initial={{ opacity: 0, height: 0 }}
                           animate={{ opacity: 1, height: 'auto' }}
                           exit={{ opacity: 0, height: 0 }}
                           transition={{ duration: 0.15 }}
                         >
-                          {group.label}
-                        </motion.p>
+                          {group.collapsible ? (
+                            <button
+                              type="button"
+                              aria-expanded={!groupCollapsed}
+                              onClick={() =>
+                                setCollapsedGroups((current) => ({
+                                  ...current,
+                                  [group.label]: !groupCollapsed,
+                                }))
+                              }
+                              className="mb-1 flex w-full items-center justify-between rounded-md px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-gray-400 transition-colors hover:bg-gray-50 hover:text-gray-600"
+                            >
+                              <span>{group.label}</span>
+                              <ChevronDown
+                                className={`h-3 w-3 transition-transform duration-200 ${groupCollapsed ? '-rotate-90' : ''}`}
+                              />
+                            </button>
+                          ) : (
+                            <p className="mb-1.5 px-3 text-[10px] font-semibold uppercase tracking-wider text-gray-400">
+                              {group.label}
+                            </p>
+                          )}
+                        </motion.div>
                       )}
                     </AnimatePresence>
 
                     {/* Nav Items */}
+                    <AnimatePresence initial={false}>
+                      {(!sidebarOpen || !groupCollapsed) && (
+                        <motion.div
+                          initial={sidebarOpen ? { height: 0, opacity: 0 } : false}
+                          animate={{ height: 'auto', opacity: 1 }}
+                          exit={{ height: 0, opacity: 0 }}
+                          transition={{ duration: 0.18, ease: 'easeOut' }}
+                          className="overflow-hidden"
+                        >
                     {group.items.map((item) => {
                       const isActive = dashboardPage === item.page;
                       const navBtn = (
@@ -948,80 +931,15 @@ export function DashboardV2() {
 
                       return navBtn;
                     })}
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
                   </div>
                 );
               })}
             </nav>
           </ScrollArea>
 
-          {/* Bottom Section */}
-          <div className="border-t border-gray-100 p-2 shrink-0 space-y-0.5">
-            {sidebarOpen && (
-              <>
-                <button
-                  onClick={() => setDashboardPage('billing')}
-                  className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-gray-500 hover:bg-gray-50 hover:text-gray-700 transition-colors"
-                >
-                  <CreditCard className="h-4 w-4 shrink-0" />
-                  <span className="truncate">{creditsBalance.toLocaleString()} credits</span>
-                  <Badge
-                    variant="secondary"
-                    className="ml-auto text-[10px] px-1.5 py-0 bg-[#035EF9]/10 text-[#035EF9] border-0"
-                  >
-                    Pro
-                  </Badge>
-                </button>
-              </>
-            )}
-
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <button
-                  onClick={() => {
-                    logout();
-                    setView('landing');
-                  }}
-                  className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-gray-400 hover:bg-red-50 hover:text-red-600 transition-colors ${
-                    !sidebarOpen ? 'justify-center px-0' : ''
-                  }`}
-                >
-                  <LogOut className="h-4 w-4 shrink-0" />
-                  {sidebarOpen && <span className="truncate">Log Out</span>}
-                </button>
-              </TooltipTrigger>
-              {!sidebarOpen && (
-                <TooltipContent side="right" sideOffset={8}>
-                  Log Out
-                </TooltipContent>
-              )}
-            </Tooltip>
-
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <button
-                  aria-label={sidebarOpen ? 'Collapse sidebar' : 'Expand sidebar'}
-                  onClick={() => setSidebarOpen(!sidebarOpen)}
-                  className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-gray-400 hover:bg-gray-50 hover:text-gray-600 transition-colors ${
-                    !sidebarOpen ? 'justify-center px-0' : ''
-                  }`}
-                >
-                  {sidebarOpen ? (
-                    <>
-                      <ChevronLeft className="h-4 w-4 shrink-0" />
-                      <span className="truncate">Collapse</span>
-                    </>
-                  ) : (
-                    <ChevronRight className="h-4 w-4 shrink-0" />
-                  )}
-                </button>
-              </TooltipTrigger>
-              {!sidebarOpen && (
-                <TooltipContent side="right" sideOffset={8}>
-                  Expand Sidebar
-                </TooltipContent>
-              )}
-            </Tooltip>
-          </div>
         </motion.aside>
 
         {/* ── Main Area ────────────────────────────────────────────────── */}
@@ -1139,48 +1057,78 @@ export function DashboardV2() {
                         {user?.name?.split(' ').map((n) => n[0]).join('') || 'SC'}
                       </AvatarFallback>
                     </Avatar>
-                    <div className="hidden lg:block text-left">
-                      <p className="text-sm font-medium text-[#0B0F1A] leading-tight">
+                    <div className="hidden max-w-36 min-w-0 lg:block text-left">
+                      <p className="truncate text-sm font-medium text-[#0B0F1A] leading-tight">
                         {user?.name || 'SellerCrew User'}
                       </p>
-                      <p className="text-[10px] text-gray-400 leading-tight">
+                      <p className="truncate text-[10px] text-gray-400 leading-tight">
                         {activeWorkspace?.name || 'Professional Plan'}
                       </p>
                     </div>
                     <ChevronDown className="h-3.5 w-3.5 text-gray-400 hidden lg:block" />
                   </button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-48">
+                <DropdownMenuContent align="end" sideOffset={8} className="w-72 rounded-xl p-2 shadow-xl">
                   <DropdownMenuLabel className="font-normal">
-                    <div className="flex flex-col space-y-1">
-                      <p className="text-sm font-medium">{user?.name || 'SellerCrew User'}</p>
-                      <p className="text-xs text-gray-500">
-                        {user?.email || 'demo@sellercrew.ai'}
-                      </p>
+                    <div className="flex items-center gap-3 p-1">
+                      <Avatar className="h-10 w-10">
+                        {user?.avatar ? <AvatarImage src={user.avatar} alt={user?.name || 'User'} /> : null}
+                        <AvatarFallback className="bg-[#0B0F1A] text-xs font-semibold text-white">
+                          {user?.name?.split(' ').map((n) => n[0]).join('').slice(0, 2) || 'SC'}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-semibold">{user?.name || 'SellerCrew User'}</p>
+                        <p className="truncate text-xs text-gray-500">{user?.email || 'demo@sellercrew.ai'}</p>
+                      </div>
                     </div>
                   </DropdownMenuLabel>
                   <DropdownMenuSeparator />
-                  {isAdmin && (
-                    <>
-                      <DropdownMenuItem asChild className="cursor-pointer">
-                        <a href="/admin">
-                          <ShieldCheck className="mr-2 h-4 w-4" />
-                          Admin Dashboard
-                        </a>
-                      </DropdownMenuItem>
-                      <DropdownMenuSeparator />
-                    </>
-                  )}
-                  <DropdownMenuItem
-                    className="cursor-pointer text-red-600 focus:text-red-600"
-                    onClick={() => {
+                  <DropdownMenuItem className="cursor-pointer py-2.5" onClick={() => setDashboardPage('account-settings')}>
+                    <UserCog className="mr-1 h-4 w-4" />
+                    <div className="flex flex-col">
+                      <span>Account settings</span>
+                      <span className="text-[10px] text-gray-400">Profile, workspace, and security</span>
+                    </div>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem className="cursor-pointer py-2.5" onClick={() => setDashboardPage('plans')}>
+                    <CreditCard className="mr-1 h-4 w-4" />
+                    <div className="flex flex-1 items-center justify-between">
+                      <div className="flex flex-col">
+                        <span>Plan and billing</span>
+                        <span className="text-[10px] text-gray-400">{creditsBalance.toLocaleString()} credits remaining</span>
+                      </div>
+                      <Badge variant="secondary" className="border-0 bg-[#035EF9]/10 text-[10px] capitalize text-[#035EF9]">
+                        {currentPlan}
+                      </Badge>
+                    </div>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem className="cursor-pointer py-2.5" onClick={() => setDashboardPage('usage')}>
+                    <Activity className="mr-1 h-4 w-4" />
+                    Usage and credits
+                  </DropdownMenuItem>
+                  <DropdownMenuItem className="cursor-pointer py-2.5" onClick={() => setDashboardPage('invoices')}>
+                    <Receipt className="mr-1 h-4 w-4" />
+                    Invoices
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  {process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY ? (
+                    <ClerkLogoutMenuItem onLocalLogout={() => {
                       logout();
                       setView('landing');
-                    }}
-                  >
-                    <LogOut className="mr-2 h-4 w-4" />
-                    Log Out
-                  </DropdownMenuItem>
+                    }} />
+                  ) : (
+                    <DropdownMenuItem
+                      className="cursor-pointer py-2.5 text-red-600 focus:text-red-600"
+                      onClick={() => {
+                        logout();
+                        setView('landing');
+                      }}
+                    >
+                      <LogOut className="mr-2 h-4 w-4" />
+                      Log Out
+                    </DropdownMenuItem>
+                  )}
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>

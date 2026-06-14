@@ -5,15 +5,26 @@ node_modules
 .git
 .vercel
 *.log
-*.png
-New folder
-db
-download
-upload
-tool-results
-examples
+*.tsbuildinfo
+
 .env
 .env.local
 .env.*
 !.env.example
-*.tsbuildinfo
+!.env.docker.example
+
+/db
+/download
+/upload
+/tool-results
+/examples
+/.zscripts
+/New folder
+
+# Design exports and screenshots stored at the repository root.
+/*.png
+/*.jpg
+/*.jpeg
+/*.webp
+/*.md
+!README.md

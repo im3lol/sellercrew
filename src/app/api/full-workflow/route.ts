@@ -7,7 +7,7 @@ export const runtime = "nodejs";
 // streaming route at /api/full-workflow/stream. This handler is kept only so
 // the path does not 404; it performs no AI work and stays behind auth.
 export async function POST(request: NextRequest) {
-  const access = guard(request, { scope: "full-workflow-legacy", limit: 5, windowMs: 60 * 1000 });
+  const access = await guard(request, { scope: "full-workflow-legacy", limit: 5, windowMs: 60 * 1000 });
   if (!access.ok) return access.response;
 
   return NextResponse.json(

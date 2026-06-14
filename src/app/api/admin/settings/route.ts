@@ -14,6 +14,8 @@ const patchSchema = z.object({
       openrouter: z.string().trim().max(160).optional(),
       openai: z.string().trim().max(160).optional(),
       geminiImage: z.string().trim().max(160).optional(),
+      openrouterTextFallbacks: z.array(z.string().trim().min(1).max(160)).max(10).optional(),
+      openrouterImageFallbacks: z.array(z.string().trim().min(1).max(160)).max(10).optional(),
     })
     .optional(),
   providerOrder: z.array(z.enum(["anthropic", "gemini", "openrouter"])).min(1).max(3).optional(),

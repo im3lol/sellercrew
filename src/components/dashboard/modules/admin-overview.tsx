@@ -1,6 +1,5 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
 import {
   Activity,
   Database,
@@ -16,64 +15,32 @@ import {
   MinusCircle,
   Loader2,
   RefreshCw,
+  Timer,
+  Zap,
+  ImageIcon,
+  Info,
 } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-
-interface StatusData {
-  health: { database: boolean; sessionSecret: boolean; appUrl: string; anyProvider: boolean };
-  providers: { id: string; label: string; configured: boolean; model: string }[];
-  counts: Record<string, number>;
-  accuracy: {
-    completedRuns: number;
-    blockedRuns: number;
-    avgOverall: number;
-    avgQuality: number;
-    avgSeo: number;
-    avgConversion: number;
-    avgCompliance: number;
-    avgAccuracy: number;
-    avgHallucinationRisk: number;
-    avgDurationMs: number;
-    byProvider: { provider: string; count: number }[];
-  };
-  recentRuns: {
-    id: string; provider: string | null; model: string | null; status: string; blocked: boolean;
-    overallScore: number; complianceScore: number; accuracyScore: number; hallucinationRisk: number;
-    policyStatus: string | null; durationMs: number; createdAt: string;
-  }[];
-  features: { name: string; status: string }[];
-  recentUsers: { id: string; name: string | null; email: string; createdAt: string }[];
-  recentOrgs: { id: string; name: string; plan: string; status: string; credits: number; members: number; projects: number; createdAt: string }[];
-}
+import { useAdminStatus } from '@/components/admin/admin-status';
 
 export function AdminOverview() {
-  const [data, setData] = useState<StatusData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [forbidden, setForbidden] = useState(false);
-
-  const load = useCallback(async () => {
-    setLoading(true);
-    try {
-      const res = await fetch('/api/admin/status', { credentials: 'include' });
-      if (res.status === 401 || res.status === 403) {
-        setForbidden(true);
-        return;
-      }
-      setData(await res.json());
-    } catch {
-      /* ignore */
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    load();
-  }, [load]);
+  const { data, loading, forbidden, error, reload } = useAdminStatus();
 
   if (forbidden) return <Forbidden />;
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center py-24 text-center">
+        <Database className="h-10 w-10 text-slate-300" />
+        <h3 className="mt-4 text-lg font-semibold text-slate-800">System report unavailable</h3>
+        <p className="mt-1 text-sm text-slate-500">{error}</p>
+        <Button variant="outline" size="sm" className="mt-4 gap-2" onClick={reload}>
+          <RefreshCw className="h-4 w-4" /> Try again
+        </Button>
+      </div>
+    );
+  }
   if (loading || !data) {
     return (
       <div className="flex items-center justify-center py-24">
@@ -91,7 +58,7 @@ export function AdminOverview() {
           <h2 className="text-xl font-bold tracking-tight text-slate-900">System Status & Report</h2>
           <p className="text-sm text-slate-500">Live health, data, accuracy, and development status.</p>
         </div>
-        <Button variant="outline" size="sm" className="gap-2" onClick={load}>
+        <Button variant="outline" size="sm" className="gap-2" onClick={reload}>
           <RefreshCw className="h-4 w-4" /> Refresh
         </Button>
       </div>
@@ -163,21 +130,73 @@ export function AdminOverview() {
         </Card>
       </div>
 
-      {/* Providers */}
-      <Card className="p-5">
-        <h3 className="mb-4 text-sm font-semibold text-slate-800">AI Providers</h3>
-        <div className="grid gap-3 sm:grid-cols-2">
-          {data.providers.map((p) => (
-            <div key={p.id} className="flex items-center justify-between rounded-lg border border-slate-100 bg-slate-50/60 px-4 py-3">
-              <div>
-                <p className="text-sm font-medium text-slate-800">{p.label}</p>
-                <p className="text-xs text-slate-400">{p.model}</p>
-              </div>
-              <Badge variant="outline" className={p.configured ? 'text-emerald-600 border-emerald-200' : 'text-slate-400'}>
-                {p.configured ? 'Configured' : 'Not set'}
-              </Badge>
+      {/* API usage */}
+      <Card className="overflow-hidden border-slate-200 shadow-sm">
+        <div className="flex flex-wrap items-start justify-between gap-3 border-b border-slate-100 px-5 py-4">
+          <div>
+            <div className="flex items-center gap-2">
+              <Zap className="h-4 w-4 text-[#7E44E6]" />
+              <h3 className="text-sm font-bold text-slate-900">API usage & provider data</h3>
             </div>
-          ))}
+            <p className="mt-1 text-xs text-slate-500">Usage recorded from full listing workflow runs.</p>
+          </div>
+          <div className="flex items-center gap-1.5 rounded-lg bg-amber-50 px-2.5 py-1.5 text-[11px] text-amber-700">
+            <Info className="h-3.5 w-3.5" />
+            Token and cost tracking is not enabled yet.
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-px bg-slate-100 sm:grid-cols-3 lg:grid-cols-6">
+          <UsageMetric label="Total runs" value={data.apiUsage.totalRuns} />
+          <UsageMetric label="Last 24 hours" value={data.apiUsage.runs24h} />
+          <UsageMetric label="Last 7 days" value={data.apiUsage.runs7d} />
+          <UsageMetric label="Completed" value={data.apiUsage.completedRuns} tone="green" />
+          <UsageMetric label="Blocked" value={data.apiUsage.blockedRuns} tone="amber" />
+          <UsageMetric label="Failed" value={data.apiUsage.failedRuns} tone="red" />
+        </div>
+        <div className="grid gap-4 p-5 xl:grid-cols-2">
+          {data.providers.map((provider) => {
+            const usageRows = data.apiUsage.providerUsage.filter((usage) => usage.provider === provider.id);
+            const totalRuns = usageRows.reduce((total, usage) => total + usage.totalRuns, 0);
+            const completedRuns = usageRows.reduce((total, usage) => total + usage.completedRuns, 0);
+            const blockedRuns = usageRows.reduce((total, usage) => total + usage.blockedRuns, 0);
+            const generatedImages = usageRows.reduce((total, usage) => total + usage.generatedImages, 0);
+            const weightedDuration = usageRows.reduce((total, usage) => total + usage.avgDurationMs * usage.totalRuns, 0);
+            const avgDurationMs = totalRuns ? Math.round(weightedDuration / totalRuns) : 0;
+            const successRate = totalRuns ? Math.round((completedRuns / totalRuns) * 100) : 0;
+            const lastUsedAt = usageRows
+              .map((usage) => usage.lastUsedAt)
+              .filter((value): value is string => Boolean(value))
+              .sort()
+              .at(-1);
+
+            return (
+              <div key={provider.id} className="rounded-xl border border-slate-200 bg-white p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="font-bold text-slate-900">{provider.label}</p>
+                    <p className="truncate text-xs text-slate-500">{provider.model}</p>
+                  </div>
+                  <Badge
+                    variant="outline"
+                    className={provider.configured ? 'border-emerald-200 bg-emerald-50 text-emerald-600' : 'text-slate-400'}
+                  >
+                    {provider.configured ? 'Configured' : 'Not set'}
+                  </Badge>
+                </div>
+                <div className="mt-4 grid grid-cols-3 gap-2">
+                  <ProviderMetric label="Runs" value={totalRuns} />
+                  <ProviderMetric label="Success" value={totalRuns ? `${successRate}%` : '—'} />
+                  <ProviderMetric label="Avg time" value={totalRuns ? formatDuration(avgDurationMs) : '—'} />
+                </div>
+                <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-slate-100 pt-3 text-[11px] text-slate-500">
+                  <span className="flex items-center gap-1"><CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" /> {completedRuns} completed</span>
+                  <span className="flex items-center gap-1"><ShieldCheck className="h-3.5 w-3.5 text-amber-500" /> {blockedRuns} blocked</span>
+                  <span className="flex items-center gap-1"><ImageIcon className="h-3.5 w-3.5 text-[#7E44E6]" /> {generatedImages} images</span>
+                  <span className="flex items-center gap-1"><Timer className="h-3.5 w-3.5 text-slate-400" /> {lastUsedAt ? `Last used ${new Date(lastUsedAt).toLocaleString()}` : 'No recorded usage'}</span>
+                </div>
+              </div>
+            );
+          })}
         </div>
       </Card>
 
@@ -224,13 +243,13 @@ export function AdminOverview() {
       <div className="grid gap-6 lg:grid-cols-2">
         <MiniTable
           title="Recent users"
-          rows={data.recentUsers.map((u) => [u.name || u.email, u.email, new Date(u.createdAt).toLocaleDateString()])}
+          rows={data.recentUsers.slice(0, 10).map((u) => [u.name || u.email, u.email, new Date(u.createdAt).toLocaleDateString()])}
           headers={['Name', 'Email', 'Joined']}
           empty="No users yet."
         />
         <MiniTable
           title="Workspaces"
-          rows={data.recentOrgs.map((o) => [o.name, `${o.plan} · ${o.credits} cr`, `${o.members} member(s) · ${o.projects} project(s)`])}
+          rows={data.recentOrgs.slice(0, 10).map((o) => [o.name, `${o.plan} · ${o.credits} cr`, `${o.members} member(s) · ${o.projects} project(s)`])}
           headers={['Workspace', 'Plan', 'Activity']}
           empty="No workspaces yet."
         />
@@ -263,6 +282,31 @@ function Stat({ icon: Icon, label, value }: { icon: React.ElementType; label: st
       <p className="text-xs text-slate-500">{label}</p>
     </Card>
   );
+}
+
+function UsageMetric({ label, value, tone = 'default' }: { label: string; value: number; tone?: 'default' | 'green' | 'amber' | 'red' }) {
+  const color = tone === 'green' ? 'text-emerald-600' : tone === 'amber' ? 'text-amber-600' : tone === 'red' ? 'text-red-600' : 'text-slate-900';
+  return (
+    <div className="bg-white px-4 py-3">
+      <p className={`text-xl font-extrabold ${color}`}>{value.toLocaleString()}</p>
+      <p className="text-[11px] text-slate-500">{label}</p>
+    </div>
+  );
+}
+
+function ProviderMetric({ label, value }: { label: string; value: string | number }) {
+  return (
+    <div className="rounded-lg bg-slate-50 px-3 py-2">
+      <p className="text-base font-extrabold text-slate-900">{value}</p>
+      <p className="text-[10px] text-slate-500">{label}</p>
+    </div>
+  );
+}
+
+function formatDuration(durationMs: number) {
+  if (durationMs < 1_000) return `${durationMs}ms`;
+  if (durationMs < 60_000) return `${Math.round(durationMs / 1_000)}s`;
+  return `${Math.round(durationMs / 60_000)}m`;
 }
 
 function ScoreBar({ label, value, invert }: { label: string; value: number; invert?: boolean }) {
@@ -323,7 +367,7 @@ function Forbidden() {
     <div className="flex flex-col items-center justify-center py-24 text-center">
       <ShieldCheck className="h-10 w-10 text-slate-300" />
       <h3 className="mt-4 text-lg font-semibold text-slate-800">Admin access required</h3>
-      <p className="mt-1 max-w-sm text-sm text-slate-500">This area is available to workspace owners and admins only.</p>
+      <p className="mt-1 max-w-sm text-sm text-slate-500">This area is restricted to platform administrators.</p>
     </div>
   );
 }

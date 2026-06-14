@@ -152,7 +152,7 @@ export function PolicyBank() {
         <ShieldCheck className="h-10 w-10 text-slate-300" />
         <h3 className="mt-4 text-lg font-semibold text-slate-800">Admin access required</h3>
         <p className="mt-1 max-w-sm text-sm text-slate-500">
-          The policy knowledge base is managed by workspace owners and admins only.
+          The policy knowledge base is restricted to platform administrators.
         </p>
       </div>
     );

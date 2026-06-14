@@ -74,11 +74,30 @@ export async function POST(request: NextRequest) {
   if (!parsed.success) return NextResponse.json({ error: "Invalid project." }, { status: 400 });
 
   const { id, name, marketplace, country, status, agentId } = parsed.data;
-  // Upsert so a client-generated id stays stable across optimistic create + sync.
-  const project = await db.project.upsert({
-    where: { id: id ?? "" },
-    update: { name, ...(status ? { status } : {}) },
-    create: {
+
+  // A client-generated id keeps the row stable across optimistic create + sync.
+  // We must NOT upsert on the bare global id: that would let a caller overwrite
+  // another org's project by guessing its id. Only update a row we own; otherwise
+  // create a fresh one (ignoring the supplied id if it collides with someone else's).
+  if (id) {
+    const owned = await db.project.findFirst({
+      where: { id, organizationId: ctx.organizationId },
+      select: { id: true },
+    });
+    if (owned) {
+      const project = await db.project.update({
+        where: { id },
+        data: { name, ...(status ? { status } : {}) },
+      });
+      return NextResponse.json({ project: toDashboardProject(project) }, { status: 200 });
+    }
+    // id belongs to another org (or doesn't exist yet): fall through to create.
+    const taken = await db.project.findUnique({ where: { id }, select: { id: true } });
+    if (taken) return NextResponse.json({ error: "Project not found." }, { status: 404 });
+  }
+
+  const project = await db.project.create({
+    data: {
       ...(id ? { id } : {}),
       organizationId: ctx.organizationId,
       name,

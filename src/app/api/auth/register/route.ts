@@ -32,6 +32,9 @@ export async function POST(request: NextRequest) {
   }
 
   const { name, email, password } = parsed.data;
+  if (email === process.env.ADMIN_EMAIL?.trim().toLowerCase()) {
+    return NextResponse.json({ error: "This email is not available." }, { status: 409 });
+  }
 
   const existing = await db.user.findUnique({ where: { email } });
   if (existing) {
@@ -39,9 +42,6 @@ export async function POST(request: NextRequest) {
   }
 
   const starterCredits = SUBSCRIPTION_PLANS.starter.credits;
-
-  // The very first account to register becomes the global admin.
-  const isFirstUser = (await db.user.count()) === 0;
 
   let userId: string;
   try {
@@ -51,7 +51,7 @@ export async function POST(request: NextRequest) {
           email,
           name,
           passwordHash: hashPassword(password),
-          role: isFirstUser ? "admin" : "user",
+          role: "user",
         },
       });
       const org = await tx.organization.create({

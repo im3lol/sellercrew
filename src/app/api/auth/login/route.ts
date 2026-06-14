@@ -27,8 +27,21 @@ export async function POST(request: NextRequest) {
   }
 
   const { email, password } = parsed.data;
+
+  // Per-account limit so a single target can't be brute-forced from rotating IPs.
+  const perAccount = rateLimit(`login:acct:${email}`, 10, 15 * 60 * 1000);
+  if (!perAccount.ok) {
+    return NextResponse.json(
+      { error: `Too many sign-in attempts. Try again in ${perAccount.retryAfterSeconds} seconds.` },
+      { status: 429 }
+    );
+  }
+
+  if (email === process.env.ADMIN_EMAIL?.trim().toLowerCase()) {
+    return NextResponse.json({ error: "Invalid email or password." }, { status: 401 });
+  }
   const user = await db.user.findUnique({ where: { email } });
-  if (!user || !verifyPassword(password, user.passwordHash)) {
+  if (!user || user.accountStatus !== "active" || !verifyPassword(password, user.passwordHash)) {
     return NextResponse.json({ error: "Invalid email or password." }, { status: 401 });
   }
 

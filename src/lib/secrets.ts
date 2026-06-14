@@ -19,7 +19,7 @@ const cache = new Map<SecretName, { value: string | null; ts: number }>();
 
 // Tolerate users pasting a whole `.env` line (e.g. `REDIS_URL="rediss://..."`)
 // by stripping a leading `NAME=` prefix and surrounding quotes.
-function cleanSecretValue(raw: string): string {
+export function cleanSecretValue(raw: string): string {
   let value = raw.trim();
   const prefixed = value.match(/^[A-Za-z_][A-Za-z0-9_]*\s*=\s*([\s\S]*)$/);
   if (prefixed) value = prefixed[1].trim();

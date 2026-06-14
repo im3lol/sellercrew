@@ -367,6 +367,24 @@ async function generateWithOpenRouterTextModels(
     : "No OpenRouter text model is configured.");
 }
 
+/**
+ * Resolve the ordered list of providers to try for a text request, given the
+ * admin-configured order, whether OpenRouter fallback is enabled, and which
+ * providers have a runner available. Pure + exported so it can be unit-tested.
+ */
+export function resolveProviderChain(
+  order: string[],
+  fallback: boolean,
+  available: string[] = ["anthropic", "gemini", "openrouter"]
+): string[] {
+  let chain = order.filter((key) => available.includes(key));
+  if (fallback && available.includes("openrouter") && !chain.includes("openrouter")) chain.push("openrouter");
+  if (!fallback) chain = chain.filter((key) => key !== "openrouter");
+  chain = [...new Set(chain)];
+  if (!chain.length) chain = available.filter((k) => k !== "openrouter");
+  return chain;
+}
+
 export async function generateAIText(options: GenerateAITextOptions): Promise<AITextResult> {
   const settings = await getSettings().catch(() => null);
   const models = settings?.models;
@@ -382,11 +400,7 @@ export async function generateAIText(options: GenerateAITextOptions): Promise<AI
     ]),
   };
 
-  let chain = order.filter((key) => key in runners);
-  if (fallback && !chain.includes("openrouter")) chain.push("openrouter");
-  if (!fallback) chain = chain.filter((key) => key !== "openrouter");
-  chain = [...new Set(chain)];
-  if (!chain.length) chain = ["anthropic", "gemini"];
+  const chain = resolveProviderChain(order, fallback, Object.keys(runners));
 
   const errors: string[] = [];
   for (const key of chain) {

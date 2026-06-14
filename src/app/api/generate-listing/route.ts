@@ -23,7 +23,7 @@ const listingSchema = z.object({
 });
 
 export async function POST(request: NextRequest) {
-  const access = guard(request, { scope: "generate-listing", limit: 15, windowMs: 60 * 1000 });
+  const access = await guard(request, { scope: "generate-listing", limit: 15, windowMs: 60 * 1000 });
   if (!access.ok) return access.response;
 
   try {

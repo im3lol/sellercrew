@@ -1,0 +1,39 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Generate Prisma client
+        run: bun run db:generate
+
+      - name: Type check
+        run: bun run typecheck
+
+      - name: Unit tests
+        run: bun run test
+
+      - name: Build
+        run: bun run build
+        env:
+          # Build-time only placeholders — no real services are contacted because
+          # all data routes are force-dynamic and run at request time.
+          SESSION_SECRET: ci-placeholder-session-secret-at-least-32-chars
+          DATABASE_URL: postgresql://user:pass@localhost:5432/db?pgbouncer=true
+          DIRECT_URL: postgresql://user:pass@localhost:5432/db
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: pk_test_placeholder
+          WORKFLOW_QUEUE_DISABLED: "1"

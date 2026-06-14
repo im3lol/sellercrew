@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { requireAdmin } from "@/lib/api-guard";
 import { rateLimit } from "@/lib/rate-limit";
 import { ingestPolicyDocument } from "@/lib/policies";
+import { ensureDefaultPolicyKnowledgeBase } from "@/lib/default-policies";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
@@ -20,6 +21,7 @@ export async function GET(request: NextRequest) {
   const access = await requireAdmin(request);
   if (!access.ok) return access.response;
 
+  await ensureDefaultPolicyKnowledgeBase();
   const documents = await db.policyDocument.findMany({
     orderBy: { createdAt: "desc" },
     include: {
@@ -60,7 +62,7 @@ export async function POST(request: NextRequest) {
   const access = await requireAdmin(request);
   if (!access.ok) return access.response;
 
-  const limited = rateLimit(`policy-upload:${access.session.uid}`, 10, 5 * 60 * 1000);
+  const limited = rateLimit(`policy-upload:${access.session.email}`, 10, 5 * 60 * 1000);
   if (!limited.ok) {
     return NextResponse.json(
       { error: `Too many uploads. Try again in ${limited.retryAfterSeconds} seconds.` },
@@ -84,7 +86,6 @@ export async function POST(request: NextRequest) {
       title,
       fileName,
       markdown,
-      uploadedById: access.session.uid,
     });
     return NextResponse.json({ success: true, summary }, { status: 201 });
   } catch (error) {

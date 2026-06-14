@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { isQueueEnabled } from "@/lib/queue";
+import { getWorkflowQueue, isQueueEnabled } from "@/lib/queue";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -16,18 +16,26 @@ export async function GET() {
   }
 
   let queueConfigured = false;
+  let queue = false;
   try {
     queueConfigured = await isQueueEnabled();
+    if (queueConfigured) {
+      // Resolves once the underlying Redis connection is ready; throws otherwise.
+      await (await getWorkflowQueue()).waitUntilReady();
+      queue = true;
+    }
   } catch {
     queueConfigured = false;
+    queue = false;
   }
 
-  const healthy = database;
+  const healthy = database && (!queueConfigured || queue);
   return NextResponse.json(
     {
       status: healthy ? "ok" : "degraded",
       database,
       queueConfigured,
+      queue,
       time: new Date().toISOString(),
     },
     { status: healthy ? 200 : 503 }

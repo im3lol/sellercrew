@@ -16,7 +16,7 @@ const requestSchema = z.object({
 });
 
 export async function POST(request: NextRequest) {
-  const access = guard(request, { scope: "agent-chat", limit: 30, windowMs: 60 * 1000 });
+  const access = await guard(request, { scope: "agent-chat", limit: 30, windowMs: 60 * 1000 });
   if (!access.ok) return access.response;
 
   try {

@@ -4,7 +4,7 @@ import { useDashboardStore, type DashboardAsset } from "@/lib/dashboard-store";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { FileText, FolderOpen, ImagePlus, Trash2, Upload, WandSparkles } from "lucide-react";
+import { ExternalLink, FileText, FolderOpen, ImagePlus, Trash2, Upload, WandSparkles } from "lucide-react";
 import { toast } from "sonner";
 
 async function imagePreview(file: File) {
@@ -65,7 +65,19 @@ function AssetFolder({
         {assets.length ? (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {assets.map((asset) => (
-              <div key={asset.id} className="overflow-hidden rounded-xl border bg-white">
+              <div key={asset.id} className="group relative overflow-hidden rounded-xl border bg-white">
+                {asset.driveUrl ? (
+                  <a
+                    href={asset.driveUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    title="Open the full-resolution file in Google Drive"
+                    className="absolute right-2 top-2 z-10 inline-flex items-center gap-1 rounded-md bg-black/60 px-2 py-1 text-xs font-medium text-white opacity-0 transition group-hover:opacity-100"
+                  >
+                    <ExternalLink className="size-3" />
+                    Drive
+                  </a>
+                ) : null}
                 {asset.type === "image" && asset.dataUrl ? (
                   <img src={asset.dataUrl} alt={asset.name} className="aspect-square w-full object-cover" />
                 ) : (
@@ -80,8 +92,16 @@ function AssetFolder({
                     <p className="truncate text-sm font-medium">{asset.name}</p>
                     <p className="mt-0.5 truncate text-xs text-gray-400">
                       {projectName(asset.projectId)} · {(asset.size / 1024).toFixed(1)} KB
+                      {asset.driveUrl ? " · backed up" : ""}
                     </p>
                   </div>
+                  {asset.driveUrl ? (
+                    <Button size="icon" variant="ghost" asChild title="Open in Google Drive">
+                      <a href={asset.driveUrl} target="_blank" rel="noopener noreferrer">
+                        <ExternalLink className="size-4 text-[#035EF9]" />
+                      </a>
+                    </Button>
+                  ) : null}
                   <Button size="icon" variant="ghost" onClick={() => onDelete(asset.id)}>
                     <Trash2 className="size-4 text-red-500" />
                   </Button>
