@@ -321,67 +321,99 @@ export function FullWorkflow() {
     setActiveTab("workflow");
 
     try {
-      const response = await fetch("/api/full-workflow/stream", {
+      let data: { provider: string; model?: string; result: unknown } | null = null;
+
+      type WorkflowEvent = {
+        type: "step" | "report" | "generated_image" | "provider" | "result" | "error";
+        stepId?: string;
+        status?: "working" | "completed" | "blocked";
+        report?: AgentReport;
+        image?: GeneratedImage;
+        message?: string;
+        provider?: string;
+        model?: string;
+        result?: unknown;
+        error?: string;
+      };
+
+      const applyEvent = (event: WorkflowEvent): { provider: string; model?: string; result: unknown } | null => {
+        if (event.type === "step" && event.status && event.stepId) {
+          setStepStatuses((current) => ({ ...current, [event.stepId!]: event.status! }));
+          if (event.status === "working") {
+            const stepIndex = workflowSteps.findIndex((step) => step.id === event.stepId);
+            if (stepIndex >= 0) setActiveStep(stepIndex);
+            setActiveMessage(event.message ?? null);
+          }
+        }
+        if (event.type === "report" && event.report) {
+          setAgentReports((current) => [
+            ...current.filter((report) => report.stepId !== event.report!.stepId),
+            event.report!,
+          ]);
+        }
+        if (event.type === "generated_image" && event.image) {
+          setGeneratedImages((current) => [...current, event.image!]);
+        }
+        if (event.type === "provider" && event.provider) setResultProvider(event.provider);
+        if (event.type === "error") throw new Error(event.error || "The full workflow failed.");
+        if (event.type === "result" && event.provider && event.result) {
+          return { provider: event.provider, model: event.model, result: event.result };
+        }
+        return null;
+      };
+
+      // Prefer the background queue (resumable, survives navigation); if it is
+      // not configured the endpoint returns 503 and we stream inline instead.
+      const jobRes = await fetch("/api/full-workflow/jobs", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
-      if (!response.body) throw new Error("The workflow progress stream was unavailable.");
 
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = "";
-      let data: { provider: string; model?: string; result: unknown } | null = null;
-
-      while (true) {
-        const { done, value } = await reader.read();
-        buffer += decoder.decode(value, { stream: !done });
-        const lines = buffer.split("\n");
-        buffer = lines.pop() ?? "";
-
-        for (const line of lines) {
-          if (!line.trim()) continue;
-          const event = JSON.parse(line) as {
-            type: "step" | "report" | "generated_image" | "provider" | "result" | "error";
-            stepId?: string;
-            status?: "working" | "completed" | "blocked";
-            report?: AgentReport;
-            image?: GeneratedImage;
-            message?: string;
-            provider?: string;
-            model?: string;
-            result?: unknown;
-            error?: string;
-          };
-          if (event.type === "step" && event.status && event.stepId) {
-            setStepStatuses((current) => ({ ...current, [event.stepId!]: event.status! }));
-            if (event.status === "working") {
-              const stepIndex = workflowSteps.findIndex((step) => step.id === event.stepId);
-              if (stepIndex >= 0) setActiveStep(stepIndex);
-              setActiveMessage(event.message ?? null);
+      if (jobRes.status === 202) {
+        const { jobId } = (await jobRes.json()) as { jobId: string };
+        let processed = 0;
+        let polls = 0;
+        const maxPolls = 180; // ~6 minutes
+        while (true) {
+          if (polls++ >= maxPolls) {
+            throw new Error("The workflow is taking too long. Make sure the background worker (bun run worker) is running.");
+          }
+          await new Promise((resolve) => setTimeout(resolve, 2000));
+          const poll = await fetch(`/api/full-workflow/jobs?id=${encodeURIComponent(jobId)}`, { credentials: "include" });
+          if (!poll.ok) throw new Error("Lost track of the workflow job.");
+          const job = (await poll.json()) as { status: string; events?: unknown[]; error?: string };
+          const events = Array.isArray(job.events) ? job.events : [];
+          for (; processed < events.length; processed += 1) {
+            const captured = applyEvent(events[processed] as WorkflowEvent);
+            if (captured) data = captured;
+          }
+          if (job.status === "completed" || job.status === "blocked") break;
+          if (job.status === "failed") throw new Error(job.error || "The full workflow failed.");
+        }
+      } else {
+        const response = await fetch("/api/full-workflow/stream", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        if (!response.body) throw new Error("The workflow progress stream was unavailable.");
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = "";
+        while (true) {
+          const { done, value } = await reader.read();
+          buffer += decoder.decode(value, { stream: !done });
+          const lines = buffer.split("\n");
+          buffer = lines.pop() ?? "";
+          for (const line of lines) {
+            if (line.trim()) {
+              const captured = applyEvent(JSON.parse(line) as WorkflowEvent);
+              if (captured) data = captured;
             }
           }
-          if (event.type === "report" && event.report) {
-            setAgentReports((current) => [
-              ...current.filter((report) => report.stepId !== event.report!.stepId),
-              event.report!,
-            ]);
-          }
-          if (event.type === "generated_image" && event.image) {
-            setGeneratedImages((current) => [...current, event.image!]);
-          }
-          if (event.type === "provider" && event.provider) setResultProvider(event.provider);
-          if (event.type === "error") throw new Error(event.error || "The full workflow failed.");
-          if (event.type === "result" && event.provider && event.result) {
-            data = {
-              provider: event.provider,
-              model: event.model,
-              result: event.result,
-            };
-          }
+          if (done) break;
         }
-
-        if (done) break;
       }
 
       if (!data) throw new Error("The workflow ended without a complete result.");
