@@ -17,6 +17,21 @@ const KEY_PREFIX = "secret:";
 const TTL_MS = 30_000;
 const cache = new Map<SecretName, { value: string | null; ts: number }>();
 
+// Tolerate users pasting a whole `.env` line (e.g. `REDIS_URL="rediss://..."`)
+// by stripping a leading `NAME=` prefix and surrounding quotes.
+function cleanSecretValue(raw: string): string {
+  let value = raw.trim();
+  const prefixed = value.match(/^[A-Za-z_][A-Za-z0-9_]*\s*=\s*([\s\S]*)$/);
+  if (prefixed) value = prefixed[1].trim();
+  if (
+    value.length >= 2 &&
+    ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'")))
+  ) {
+    value = value.slice(1, -1);
+  }
+  return value.trim();
+}
+
 export async function getSecret(name: SecretName): Promise<string | null> {
   const now = Date.now();
   const cached = cache.get(name);
@@ -30,16 +45,18 @@ export async function getSecret(name: SecretName): Promise<string | null> {
     value = null;
   }
   if (!value) value = process.env[name]?.trim() || null;
+  if (value) value = cleanSecretValue(value);
 
   cache.set(name, { value, ts: now });
   return value;
 }
 
 export async function setSecret(name: SecretName, value: string): Promise<void> {
+  const clean = cleanSecretValue(value);
   await db.systemSetting.upsert({
     where: { key: KEY_PREFIX + name },
-    create: { key: KEY_PREFIX + name, value: encryptGoogleToken(value) },
-    update: { value: encryptGoogleToken(value) },
+    create: { key: KEY_PREFIX + name, value: encryptGoogleToken(clean) },
+    update: { value: encryptGoogleToken(clean) },
   });
   cache.delete(name);
 }
