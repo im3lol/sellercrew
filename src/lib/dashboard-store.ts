@@ -39,6 +39,7 @@ export interface DashboardAsset {
   type: "image" | "document" | "brief";
   source: "customer" | "generated";
   dataUrl?: string;
+  driveUrl?: string; // Google Drive link to the full-resolution file
   size: number;
   createdAt: string;
 }
@@ -72,6 +73,7 @@ interface DashboardDataState {
   updateListingStatus: (id: string, status: ListingStatus) => void;
   deleteListing: (id: string) => void;
   addAssets: (assets: Omit<DashboardAsset, "id" | "createdAt">[]) => void;
+  attachAssetDriveLinks: (links: { name: string; driveUrl: string }[]) => void;
   deleteAsset: (id: string) => void;
   addActivity: (agentId: string, action: string) => void;
   startWorkflowRun: (projectId: string) => string;
@@ -292,6 +294,17 @@ export const useDashboardStore = create<DashboardDataState>()(
             ...state.assets,
           ],
         })),
+
+      attachAssetDriveLinks: (links) =>
+        set((state) => {
+          if (!links.length) return state;
+          const byName = new Map(links.map((link) => [link.name, link.driveUrl]));
+          return {
+            assets: state.assets.map((asset) =>
+              byName.has(asset.name) ? { ...asset, driveUrl: byName.get(asset.name) } : asset
+            ),
+          };
+        }),
 
       deleteAsset: (id) =>
         set((state) => ({

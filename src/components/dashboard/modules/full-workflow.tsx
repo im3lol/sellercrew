@@ -191,6 +191,7 @@ export function FullWorkflow() {
     createProject,
     saveListing,
     addAssets,
+    attachAssetDriveLinks,
     addActivity,
     updateProject,
   } = useDashboardStore();
@@ -518,7 +519,16 @@ export function FullWorkflow() {
             if (!syncResponse.ok) {
               throw new Error(syncData?.error || "Google Drive sync failed.");
             }
-            if (syncResponse.ok && !syncData?.skipped) toast.success("Product backed up to Google Drive.");
+            if (syncResponse.ok && !syncData?.skipped) {
+              toast.success("Product backed up to Google Drive.");
+              if (Array.isArray(syncData?.generatedImages)) {
+                attachAssetDriveLinks(
+                  syncData.generatedImages
+                    .filter((g: { name?: string; webViewLink?: string }) => g?.name && g?.webViewLink)
+                    .map((g: { name: string; webViewLink: string }) => ({ name: g.name, driveUrl: g.webViewLink }))
+                );
+              }
+            }
           })
           .catch((syncError) => {
             toast.warning(syncError instanceof Error ? syncError.message : "Google Drive sync failed.");
