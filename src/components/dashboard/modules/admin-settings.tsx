@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState, type ElementType, type ReactNode } from 'react';
 import { toast } from 'sonner';
 import { Settings2, Loader2, Save, Plug, ChevronUp, ChevronDown, ShieldCheck, Cloud, Copy, Trash2 } from 'lucide-react';
 import { Card } from '@/components/ui/card';
@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { AdminSecrets } from '@/components/dashboard/modules/admin-secrets';
 
 type ProviderId = 'anthropic' | 'gemini' | 'openrouter';
@@ -233,6 +234,7 @@ export function AdminSettings() {
         </Button>
       </div>
 
+      <SettingsGroup title="AI providers & keys" icon={Plug} defaultOpen>
       {/* API keys & secrets — admin-managed, encrypted in DB */}
       <AdminSecrets />
 
@@ -311,7 +313,9 @@ export function AdminSettings() {
           </div>
         </div>
       </Card>
+      </SettingsGroup>
 
+      <SettingsGroup title="Integrations" icon={Cloud}>
       {/* Google Drive OAuth */}
       <Card className="p-5">
         <div className="flex flex-wrap items-start justify-between gap-3">
@@ -402,6 +406,9 @@ export function AdminSettings() {
         </div>
       </Card>
 
+      </SettingsGroup>
+
+      <SettingsGroup title="Workflow & compliance" icon={ShieldCheck}>
       {/* Provider order */}
       <Card className="p-5">
         <h3 className="mb-1 text-sm font-semibold text-slate-800">Provider fallback order</h3>
@@ -458,7 +465,34 @@ export function AdminSettings() {
           className="min-h-[120px] text-sm"
         />
       </Card>
+      </SettingsGroup>
     </div>
+  );
+}
+
+function SettingsGroup({
+  title,
+  icon: Icon,
+  defaultOpen = false,
+  children,
+}: {
+  title: string;
+  icon: ElementType;
+  defaultOpen?: boolean;
+  children: ReactNode;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <Collapsible open={open} onOpenChange={setOpen} className="rounded-xl border border-slate-200 bg-slate-50/40">
+      <CollapsibleTrigger className="flex w-full items-center justify-between rounded-xl px-4 py-3 text-left hover:bg-slate-100/60">
+        <span className="flex items-center gap-2 text-sm font-bold text-slate-800">
+          <Icon className="h-4 w-4 text-[#035EF9]" />
+          {title}
+        </span>
+        <ChevronDown className={`h-4 w-4 text-slate-400 transition-transform ${open ? 'rotate-180' : ''}`} />
+      </CollapsibleTrigger>
+      <CollapsibleContent className="space-y-4 px-3 pb-3">{children}</CollapsibleContent>
+    </Collapsible>
   );
 }
 
