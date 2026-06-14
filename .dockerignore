@@ -1,0 +1,19 @@
+node_modules
+.next
+.next-local
+.next-local-build
+.git
+.vercel
+*.log
+*.png
+New folder
+db
+download
+upload
+tool-results
+examples
+.env
+.env.local
+.env.*
+!.env.example
+*.tsbuildinfo
