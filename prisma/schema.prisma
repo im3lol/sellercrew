@@ -297,3 +297,20 @@ model WorkflowRun {
   @@index([createdAt])
   @@index([status])
 }
+
+// Background workflow job processed by the BullMQ worker. The full input
+// (incl. images) and streamed progress/result live here; Redis only carries id.
+model WorkflowJob {
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id")
+  status    String   @default("queued") // queued, running, completed, blocked, failed
+  input     String   // JSON ProductInput
+  events    String   @default("[]") // JSON array of progress events
+  result    String?  // JSON FullWorkflowResult
+  error     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([status])
+}

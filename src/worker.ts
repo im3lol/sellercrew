@@ -16,8 +16,10 @@ async function main() {
       if (job.name === "healthcheck") {
         return { ok: true, at: new Date().toISOString() };
       }
-      // The multi-agent workflow handler is wired in the next step (loads the
-      // WorkflowJob row, runs the pipeline, writes progress + result to the DB).
+      if (job.name === "workflow") {
+        const { runWorkflowJob } = await import("@/lib/workflow-job-runner");
+        return runWorkflowJob((job.data as { jobId: string }).jobId);
+      }
       return { ok: false, reason: `unhandled job ${job.name}` };
     },
     { connection, concurrency: 2 }
