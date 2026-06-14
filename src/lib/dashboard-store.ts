@@ -96,6 +96,23 @@ interface WorkspaceDashboardSnapshot {
   plan: "starter" | "pro" | "agency";
 }
 
+// Keep heavy full-resolution base64 images out of localStorage (quota / data
+// loss). Generated images live in the live result and in Google Drive; only
+// lightweight metadata is persisted, capped to recent runs.
+function stripRunImages(runs: StoredWorkflowRun[] | undefined): StoredWorkflowRun[] {
+  return (runs ?? []).slice(0, 20).map((run) =>
+    run.result?.generatedImages?.length
+      ? {
+          ...run,
+          result: {
+            ...run.result,
+            generatedImages: run.result.generatedImages.map((image) => ({ ...image, dataUrl: "" })),
+          },
+        }
+      : run
+  );
+}
+
 export const useDashboardStore = create<DashboardDataState>()(
   persist(
     (set, get) => ({
@@ -391,6 +408,24 @@ export const useDashboardStore = create<DashboardDataState>()(
     {
       name: "sellercrew-dashboard-data",
       version: 5,
+      partialize: (state) => ({
+        workspaceId: state.workspaceId,
+        projects: state.projects,
+        listings: state.listings,
+        assets: state.assets,
+        activities: state.activities,
+        workflowRuns: stripRunImages(state.workflowRuns),
+        selectedProjectId: state.selectedProjectId,
+        creditsBalance: state.creditsBalance,
+        creditsUsed: state.creditsUsed,
+        plan: state.plan,
+        workspaceData: Object.fromEntries(
+          Object.entries(state.workspaceData ?? {}).map(([key, snap]) => [
+            key,
+            { ...snap, workflowRuns: stripRunImages(snap.workflowRuns) },
+          ])
+        ),
+      }),
       migrate: (persistedState) => {
         const state = persistedState as Partial<DashboardDataState>;
         const demoProjectIds = new Set(["project-earbuds", "project-coffee"]);
