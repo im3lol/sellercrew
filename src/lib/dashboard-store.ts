@@ -63,6 +63,8 @@ interface DashboardDataState {
   creditsBalance: number;
   creditsUsed: number;
   plan: "starter" | "pro" | "agency";
+  onboardingDismissed: boolean;
+  dismissOnboarding: () => void;
   loadProjects: () => Promise<void>;
   loadListings: () => Promise<void>;
   createProject: (name: string) => DashboardProject;
@@ -129,6 +131,9 @@ export const useDashboardStore = create<DashboardDataState>()(
       creditsBalance: 5000,
       creditsUsed: 0,
       plan: "pro",
+      onboardingDismissed: false,
+
+      dismissOnboarding: () => set({ onboardingDismissed: true }),
 
       loadProjects: async () => {
         try {
@@ -432,6 +437,7 @@ export const useDashboardStore = create<DashboardDataState>()(
         creditsBalance: state.creditsBalance,
         creditsUsed: state.creditsUsed,
         plan: state.plan,
+        onboardingDismissed: state.onboardingDismissed,
         workspaceData: Object.fromEntries(
           Object.entries(state.workspaceData ?? {}).map(([key, snap]) => [
             key,

@@ -1,7 +1,9 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { useAppStore } from "@/lib/store";
 import { useDashboardStore } from "@/lib/dashboard-store";
+import { OnboardingJourney } from "./onboarding-journey";
 import { agents } from "@/lib/agents";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -14,12 +16,22 @@ import {
   ArrowRight,
   Clock,
   CheckCircle2,
+  Cloud,
   Sparkles,
 } from "lucide-react";
 
 export function DashboardHome() {
-  const { setDashboardPage } = useAppStore();
+  const { setDashboardPage, activeWorkspace } = useAppStore();
   const { projects, listings, activities, creditsBalance, creditsUsed, setSelectedProject } = useDashboardStore();
+  const [driveConnected, setDriveConnected] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    if (!activeWorkspace?.id) return;
+    fetch(`/api/google-drive?workspaceId=${encodeURIComponent(activeWorkspace.id)}`)
+      .then((response) => response.json())
+      .then((data) => setDriveConnected(Boolean(data.connected)))
+      .catch(() => setDriveConnected(null));
+  }, [activeWorkspace?.id]);
   const averageCompliance = listings.length
     ? Math.round(listings.reduce((sum, listing) => sum + listing.complianceScore, 0) / listings.length)
     : 0;
@@ -32,6 +44,8 @@ export function DashboardHome() {
 
   return (
     <div className="max-w-7xl space-y-6">
+      <OnboardingJourney />
+
       {/* Welcome banner */}
       <Card className="relative overflow-hidden border-0 bg-[#0B0F1A] text-white">
         <div className="absolute inset-0">
@@ -90,6 +104,23 @@ export function DashboardHome() {
           </div>
         </CardContent>
       </Card>
+
+      {driveConnected === false && (
+        <Card className="border-[#035EF9]/15 bg-[#035EF9]/5">
+          <CardContent className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center">
+            <div className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-white text-[#035EF9] shadow-sm">
+              <Cloud className="size-5" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="font-semibold text-[#0B0F1A]">Keep every product in your own Google Drive</p>
+              <p className="mt-1 text-sm text-gray-500">Connect once to organize product images and listing rows automatically after each workflow.</p>
+            </div>
+            <Button variant="outline" className="border-[#035EF9]/20 bg-white text-[#035EF9]" onClick={() => setDashboardPage("account-settings")}>
+              Connect Google Drive
+            </Button>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Stats */}
       <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
