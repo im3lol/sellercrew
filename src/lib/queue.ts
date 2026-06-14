@@ -30,6 +30,9 @@ export async function getRedisConnectionOptions(): Promise<ConnectionOptions> {
 }
 
 export async function isQueueEnabled(): Promise<boolean> {
+  // Allow disabling the queue on hosts without a worker (e.g. Vercel-only),
+  // forcing the client's inline SSE fallback even if REDIS_URL is set.
+  if (process.env.WORKFLOW_QUEUE_DISABLED === "1") return false;
   return Boolean(await getSecret("REDIS_URL"));
 }
 
