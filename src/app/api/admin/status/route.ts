@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { requireAdmin } from "@/lib/api-guard";
 import { getSettings } from "@/lib/settings";
 import { getSecret } from "@/lib/secrets";
+import { estimateCostUsd } from "@/lib/pricing";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -174,6 +175,7 @@ export async function GET(request: NextRequest) {
       inputTokens: usage.inputTokens,
       outputTokens: usage.outputTokens,
       totalTokens: usage.inputTokens + usage.outputTokens,
+      estimatedCostUsd: estimateCostUsd(usage.model, usage.inputTokens, usage.outputTokens),
       lastUsedAt: usage.lastUsedAt,
     }))
     .sort((a, b) => b.totalRuns - a.totalRuns);
@@ -185,7 +187,8 @@ export async function GET(request: NextRequest) {
     blockedRuns: blockedCount,
     failedRuns: providerUsage.reduce((total, usage) => total + usage.failedRuns, 0),
     trackedTokens: true,
-    trackedCost: false,
+    trackedCost: true,
+    estimatedCostUsd: Math.round(providerUsage.reduce((total, usage) => total + usage.estimatedCostUsd, 0) * 10_000) / 10_000,
     totalInputTokens: providerUsage.reduce((total, usage) => total + usage.inputTokens, 0),
     totalOutputTokens: providerUsage.reduce((total, usage) => total + usage.outputTokens, 0),
     totalTokens: providerUsage.reduce((total, usage) => total + usage.totalTokens, 0),
