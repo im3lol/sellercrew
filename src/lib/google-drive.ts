@@ -219,7 +219,11 @@ export async function getGoogleUserInfo(accessToken: string): Promise<{ email?: 
   return (await res.json()) as { email?: string };
 }
 
-async function refreshAccessToken(refreshToken: string): Promise<string> {
+// Thrown when Google rejects the refresh token (revoked/expired) so callers can
+// clean up the stored connection instead of failing every request forever.
+const INVALID_REFRESH = "GOOGLE_REFRESH_INVALID";
+
+async function refreshAccessToken(refreshToken: string): Promise<{ accessToken: string; expiresInMs: number }> {
   const config = await requireConfig();
   const res = await fetch(TOKEN_URL, {
     method: "POST",
@@ -231,17 +235,41 @@ async function refreshAccessToken(refreshToken: string): Promise<string> {
       grant_type: "refresh_token",
     }),
   });
-  if (!res.ok) throw new Error("Stored Google token is invalid.");
+  if (!res.ok) {
+    // 400/401 from the token endpoint means the refresh token itself is bad.
+    throw new Error(res.status === 400 || res.status === 401 ? INVALID_REFRESH : "Could not refresh the Google access token.");
+  }
   const data = (await res.json()) as GoogleTokenResponse;
-  if (!data.access_token) throw new Error("Stored Google token is invalid.");
-  return data.access_token;
+  if (!data.access_token) throw new Error(INVALID_REFRESH);
+  return { accessToken: data.access_token, expiresInMs: (Number(data.expires_in) || 3600) * 1000 };
 }
+
+// Short-lived access-token cache (per user). Google tokens last ~1h; caching
+// avoids a token round-trip on every Drive/Sheets call (a sync makes many).
+const accessTokenCache = new Map<string, { token: string; exp: number }>();
 
 async function getAccessToken(userId: string) {
   const connection = await db.googleDriveConnection.findUnique({ where: { userId } });
   if (!connection) throw new Error("Google Drive is not connected.");
-  const accessToken = await refreshAccessToken(decryptGoogleToken(connection.encryptedRefreshToken));
-  return { accessToken, connection };
+
+  const cached = accessTokenCache.get(userId);
+  if (cached && cached.exp > Date.now() + 60_000) {
+    return { accessToken: cached.token, connection };
+  }
+
+  try {
+    const { accessToken, expiresInMs } = await refreshAccessToken(decryptGoogleToken(connection.encryptedRefreshToken));
+    accessTokenCache.set(userId, { token: accessToken, exp: Date.now() + expiresInMs });
+    return { accessToken, connection };
+  } catch (error) {
+    if (error instanceof Error && error.message === INVALID_REFRESH) {
+      // Drop the dead connection so the UI reflects "not connected" and stops retrying.
+      accessTokenCache.delete(userId);
+      await db.googleDriveConnection.delete({ where: { userId } }).catch(() => {});
+      throw new Error("Google Drive access was revoked. Please reconnect.");
+    }
+    throw error;
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -458,10 +486,20 @@ export async function syncProductToGoogle(userId: string, payload: GoogleProduct
   const generatedFolder = await ensureFolder(accessToken, "SellerCrew generated", productFolder.id);
   if (!customerFolder.id || !generatedFolder.id) throw new Error("Product image folders are unavailable.");
 
-  const [customerUploads, generatedUploads] = await Promise.all([
-    Promise.all(payload.customerImages.map((image) => uploadImage(accessToken, customerFolder.id!, image))),
-    Promise.all(payload.generatedImages.map((image) => uploadImage(accessToken, generatedFolder.id!, image))),
+  // Upload resiliently: one bad/transient image must not fail the whole sync or
+  // leave the run half-synced. Collect what succeeded; report the rest.
+  const uploadAll = async (folderId: string, images: { name: string; dataUrl: string }[]) => {
+    const settled = await Promise.allSettled(images.map((image) => uploadImage(accessToken, folderId, image)));
+    const ok = settled.flatMap((s) => (s.status === "fulfilled" ? [s.value] : []));
+    return { ok, failed: settled.length - ok.length };
+  };
+  const [customer, generated] = await Promise.all([
+    uploadAll(customerFolder.id!, payload.customerImages),
+    uploadAll(generatedFolder.id!, payload.generatedImages),
   ]);
+  const customerUploads = customer.ok;
+  const generatedUploads = generated.ok;
+  const failedUploads = customer.failed + generated.failed;
 
   const sheetId = await ensureSpreadsheet(
     accessToken,
@@ -513,5 +551,6 @@ export async function syncProductToGoogle(userId: string, payload: GoogleProduct
     productFolderUrl: `https://drive.google.com/drive/folders/${productFolder.id}`,
     customerImages: customerUploads,
     generatedImages: generatedUploads,
+    failedUploads,
   };
 }

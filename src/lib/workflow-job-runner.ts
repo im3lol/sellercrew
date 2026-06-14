@@ -40,6 +40,17 @@ export async function runWorkflowJob(jobId: string): Promise<{ jobId: string; st
         }
         void flush();
       },
+      // Record the credit charge on the job row before the long work, so a crashed
+      // process leaves enough state for the reaper to refund it.
+      onCharge: async (charge) => {
+        await db.workflowJob
+          .update({ where: { id: jobId }, data: { charged: true, creditId: charge.creditId } })
+          .catch(() => {});
+      },
+      // runWorkflow refunded itself (block/fail) — mark it so the reaper won't refund again.
+      onRefund: async () => {
+        await db.workflowJob.update({ where: { id: jobId }, data: { refunded: true } }).catch(() => {});
+      },
     });
   } catch (error) {
     errorMessage = error instanceof Error ? error.message : "The workflow failed.";

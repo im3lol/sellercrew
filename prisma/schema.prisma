@@ -308,6 +308,10 @@ model WorkflowJob {
   events    String   @default("[]") // JSON array of progress events
   result    String?  // JSON FullWorkflowResult
   error     String?
+  // Credit lifecycle (so a crashed/stranded job can be refunded by the reaper).
+  creditId  String?  @map("credit_id")
+  charged   Boolean  @default(false)
+  refunded  Boolean  @default(false)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

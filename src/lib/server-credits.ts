@@ -42,12 +42,35 @@ export async function chargeCredits(
   return { ok: true, charge: { charged: true, creditId: credit.id } };
 }
 
-/** Reverse a previous charge (e.g. the workflow was blocked or failed). */
+/**
+ * Reverse a previous charge (e.g. the workflow was blocked or failed). Single-shot:
+ * the passed charge is marked spent before the update, so calling this twice with
+ * the same charge object (or from two error paths) can't double-refund or drive
+ * `used` negative.
+ */
 export async function refundCredits(charge: CreditCharge, cost: number): Promise<void> {
   if (!charge.charged || !charge.creditId) return;
+  const creditId = charge.creditId;
+  charge.charged = false; // mark spent up-front so a second call is a no-op
   try {
     await db.credit.update({
-      where: { id: charge.creditId },
+      where: { id: creditId },
+      data: { balance: { increment: cost }, used: { decrement: cost } },
+    });
+  } catch {
+    // Best-effort refund.
+  }
+}
+
+/**
+ * Refund a charge identified only by its creditId (used by the worker reaper for
+ * jobs whose process died before they could refund themselves). Idempotency is
+ * the caller's responsibility (guard on a persisted `refunded` flag).
+ */
+export async function refundByCreditId(creditId: string, cost: number): Promise<void> {
+  try {
+    await db.credit.update({
+      where: { id: creditId },
       data: { balance: { increment: cost }, used: { decrement: cost } },
     });
   } catch {
