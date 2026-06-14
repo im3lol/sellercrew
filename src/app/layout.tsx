@@ -3,6 +3,7 @@ import { Outfit } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as SonnerToaster } from "@/components/ui/sonner";
+import { ClerkRuntimeProvider } from "@/components/auth/clerk-runtime-provider";
 
 const outfit = Outfit({
   variable: "--font-outfit",
@@ -26,9 +27,11 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body suppressHydrationWarning className={`${outfit.variable} antialiased bg-background text-foreground font-sans`}>
-        {children}
-        <Toaster />
-        <SonnerToaster richColors closeButton />
+        <ClerkRuntimeProvider>
+          {children}
+          <Toaster />
+          <SonnerToaster richColors closeButton />
+        </ClerkRuntimeProvider>
       </body>
     </html>
   );

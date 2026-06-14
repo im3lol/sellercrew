@@ -5,8 +5,9 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 // ============================================
@@ -20,12 +21,16 @@ model User {
   avatar        String?
   passwordHash  String?
   emailVerified Boolean  @default(false)
+  role          String   @default("user")
+  accountStatus String   @default("active") @map("account_status") // active | suspended
+  suspendedAt   DateTime? @map("suspended_at")
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
   memberships     OrganizationMember[]
   activityLogs    ActivityLog[]
   ownedOrgs       Organization[]      @relation("OrgOwner")
+  googleDriveConnection GoogleDriveConnection?
 }
 
 // ============================================
@@ -46,6 +51,38 @@ model Organization {
   projects     Project[]
   subscription Subscription?
   credits      Credit?
+  googleDriveSettings GoogleDriveSettings?
+}
+
+model GoogleDriveConnection {
+  id                    String   @id @default(cuid())
+  userId                String   @unique @map("user_id")
+  googleEmail           String?  @map("google_email")
+  encryptedRefreshToken String   @map("encrypted_refresh_token")
+  scope                 String
+  connectedAt           DateTime @default(now()) @map("connected_at")
+  updatedAt             DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model GoogleDriveSettings {
+  id                    String   @id @default(cuid())
+  organizationId        String   @unique @map("organization_id")
+  sheetMode             String   @default("workspace") @map("sheet_mode") // workspace | global
+  imageFolderMode       String   @default("workspace") @map("image_folder_mode") // workspace | global
+  selectedSpreadsheetId String?  @map("selected_spreadsheet_id")
+  selectedSpreadsheetName String? @map("selected_spreadsheet_name")
+  selectedFolderId      String?  @map("selected_folder_id")
+  selectedFolderName    String?  @map("selected_folder_name")
+  rootFolderId          String?  @map("root_folder_id")
+  workspaceFolderId     String?  @map("workspace_folder_id")
+  workspaceSheetId      String?  @map("workspace_sheet_id")
+  autoSync              Boolean  @default(true) @map("auto_sync")
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 }
 
 model OrganizationMember {
@@ -72,6 +109,7 @@ model Subscription {
   status         String   @default("active")  // active, past_due, cancelled, expired
   startDate      DateTime @default(now()) @map("start_date")
   endDate        DateTime? @map("end_date")
+  trialEndsAt    DateTime? @map("trial_ends_at")
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
@@ -99,6 +137,7 @@ model Project {
   marketplace    String   @default("amazon") // amazon, ebay, walmart, etc.
   country        String   @default("US")
   status         String   @default("active") // active, archived, draft
+  agentId        String   @default("ali") @map("agent_id")
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
@@ -110,10 +149,13 @@ model Project {
 model Listing {
   id          String   @id @default(cuid())
   projectId   String   @map("project_id")
+  productName String?  @map("product_name")
   title       String?
+  bullets     String   @default("[]") // JSON array of strings
   description String?
+  keywords    String   @default("[]") // JSON array of strings
   status      String   @default("draft") // draft, generated, reviewed, published
-  score       Int      @default(0)
+  score       Int      @default(0) // compliance score
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -177,4 +219,98 @@ model ActivityLog {
   createdAt DateTime @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// ============================================
+// POLICY KNOWLEDGE BASE (Saleem's compliance memory)
+// Global, admin-managed. Uploaded .md policy docs are parsed into
+// structured, deduplicated rules that Saleem references at review time.
+// ============================================
+
+model PolicyDocument {
+  id           String   @id @default(cuid())
+  title        String
+  fileName     String   @map("file_name")
+  rawMarkdown  String   @map("raw_markdown")
+  status       String   @default("active") // active, archived
+  uploadedById String?  @map("uploaded_by_id")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  rules PolicyRule[]
+}
+
+model PolicyRule {
+  id            String   @id @default(cuid())
+  documentId    String   @map("document_id")
+  category      String   // health_medical_claims, restricted_prohibited_products, etc.
+  title         String
+  ruleText      String   @map("rule_text")
+  severity      String   @default("medium") // low, medium, high, critical
+  keywords      String   @default("[]")     // JSON array of strings
+  fingerprint   String                       // normalized hash for exact-duplicate detection
+  status        String   @default("active")  // active, duplicate, superseded, archived
+  duplicateOfId String?  @map("duplicate_of_id")
+  note          String?                       // why flagged (dedup/AI rationale)
+  createdAt     DateTime @default(now())
+
+  document PolicyDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@index([category])
+  @@index([status])
+  @@index([fingerprint])
+}
+
+// ============================================
+// ADMIN: SYSTEM SETTINGS & WORKFLOW METRICS
+// ============================================
+
+model SystemSetting {
+  key       String   @id
+  value     String   // JSON-encoded value
+  updatedAt DateTime @updatedAt
+}
+
+// Server-side record of each completed/blocked workflow run, for the
+// admin accuracy & system report.
+model WorkflowRun {
+  id                String   @id @default(cuid())
+  userId            String?  @map("user_id")
+  provider          String?
+  model             String?
+  status            String   @default("completed") // completed, blocked, failed
+  blocked           Boolean  @default(false)
+  policyStatus      String?  @map("policy_status")
+  overallScore      Int      @default(0) @map("overall_score")
+  qualityScore      Int      @default(0) @map("quality_score")
+  seoScore          Int      @default(0) @map("seo_score")
+  conversionScore   Int      @default(0) @map("conversion_score")
+  complianceScore   Int      @default(0) @map("compliance_score")
+  accuracyScore     Int      @default(0) @map("accuracy_score")
+  hallucinationRisk Int      @default(0) @map("hallucination_risk")
+  generatedImages   Int      @default(0) @map("generated_images")
+  inputTokens       Int      @default(0) @map("input_tokens")
+  outputTokens      Int      @default(0) @map("output_tokens")
+  durationMs        Int      @default(0) @map("duration_ms")
+  createdAt         DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([status])
+}
+
+// Background workflow job processed by the BullMQ worker. The full input
+// (incl. images) and streamed progress/result live here; Redis only carries id.
+model WorkflowJob {
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id")
+  status    String   @default("queued") // queued, running, completed, blocked, failed
+  input     String   // JSON ProductInput
+  events    String   @default("[]") // JSON array of progress events
+  result    String?  // JSON FullWorkflowResult
+  error     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([status])
 }

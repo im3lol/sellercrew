@@ -1,0 +1,30 @@
+node_modules
+.next
+.next-local
+.next-local-build
+.git
+.vercel
+*.log
+*.tsbuildinfo
+
+.env
+.env.local
+.env.*
+!.env.example
+!.env.docker.example
+
+/db
+/download
+/upload
+/tool-results
+/examples
+/.zscripts
+/New folder
+
+# Design exports and screenshots stored at the repository root.
+/*.png
+/*.jpg
+/*.jpeg
+/*.webp
+/*.md
+!README.md

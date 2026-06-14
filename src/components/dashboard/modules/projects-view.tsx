@@ -23,53 +23,27 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useAppStore } from "@/lib/store";
+import { useDashboardStore } from "@/lib/dashboard-store";
+import { agents } from "@/lib/agents";
 import { toast } from "sonner";
 
-interface Project {
-  id: string;
-  name: string;
-  status: "active" | "completed" | "draft";
-  listingCount: number;
-  updatedAt: string;
-  agent: string;
-  agentColor: string;
-}
-
-const sampleProjects: Project[] = [
-  { id: "1", name: "Wireless Earbuds Pro", status: "active", listingCount: 3, updatedAt: "2 hours ago", agent: "Bayan", agentColor: "#F84D8E" },
-  { id: "2", name: "Coffee Maker X200", status: "active", listingCount: 1, updatedAt: "1 day ago", agent: "Hakim", agentColor: "#FC7403" },
-  { id: "3", name: "Yoga Mat Premium", status: "completed", listingCount: 5, updatedAt: "3 days ago", agent: "Nadeem", agentColor: "#3EC9D1" },
-  { id: "4", name: "Smart Watch Series 5", status: "active", listingCount: 2, updatedAt: "5 days ago", agent: "Fares", agentColor: "#36B46F" },
-  { id: "5", name: "USB-C Hub Adapter", status: "draft", listingCount: 0, updatedAt: "1 week ago", agent: "Raed", agentColor: "#035EF9" },
-  { id: "6", name: "LED Desk Lamp Pro", status: "completed", listingCount: 4, updatedAt: "2 weeks ago", agent: "Badr", agentColor: "#60697A" },
-];
-
 export function ProjectsView() {
-  const [projects, setProjects] = useState(sampleProjects);
   const [search, setSearch] = useState("");
   const { setDashboardPage } = useAppStore();
+  const {
+    projects,
+    listings,
+    updateProject,
+    deleteProject,
+    setSelectedProject,
+  } = useDashboardStore();
 
   const filteredProjects = projects.filter((p) =>
     p.name.toLowerCase().includes(search.toLowerCase())
   );
 
-  const handleCreateProject = () => {
-    const newProject: Project = {
-      id: Date.now().toString(),
-      name: "New Project",
-      status: "draft",
-      listingCount: 0,
-      updatedAt: "Just now",
-      agent: "Ali",
-      agentColor: "#FDFDFD",
-    };
-    setProjects([newProject, ...projects]);
-    toast.success("Project created!");
-    setDashboardPage("listing-builder");
-  };
-
   const handleDelete = (id: string) => {
-    setProjects(projects.filter((p) => p.id !== id));
+    deleteProject(id);
     toast.success("Project deleted");
   };
 
@@ -87,19 +61,22 @@ export function ProjectsView() {
   };
 
   return (
-    <div className="max-w-5xl space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-xl font-bold text-[#0B0F1A]">Projects</h2>
-          <p className="text-sm text-gray-500 mt-1">Manage your Amazon listing projects</p>
+    <div className="w-full max-w-7xl space-y-6">
+      <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+        <div className="min-w-0">
+          <h2 className="text-2xl font-bold tracking-tight text-[#0B0F1A]">Projects</h2>
+          <p className="mt-1 text-sm text-gray-500">Each product has its own project, workflow, listing, and image folders.</p>
         </div>
-        <Button className="bg-[#0B0F1A] text-white hover:bg-[#0B0F1A]/90" onClick={handleCreateProject}>
-          <Plus className="mr-2 h-4 w-4" /> New Project
+        <Button className="shrink-0 bg-[#0B0F1A] text-white hover:bg-[#0B0F1A]/90" onClick={() => {
+          setSelectedProject(null);
+          setDashboardPage("listing-builder");
+        }}>
+          <Plus className="mr-2 h-4 w-4" /> New Product
         </Button>
       </div>
 
       <div className="flex items-center gap-3">
-        <div className="relative flex-1 max-w-sm">
+        <div className="relative w-full sm:max-w-md">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
           <Input
             placeholder="Search projects..."
@@ -110,9 +87,15 @@ export function ProjectsView() {
         </div>
       </div>
 
-      <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {filteredProjects.map((project) => (
-          <Card key={project.id} className="hover:shadow-md transition-shadow cursor-pointer group" onClick={() => setDashboardPage("listing-builder")}>
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        {filteredProjects.map((project) => {
+          const agent = agents.find((item) => item.id === project.agentId) ?? agents[0];
+          const listingCount = listings.filter((listing) => listing.projectId === project.id).length;
+          return (
+          <Card key={project.id} className="group min-h-44 cursor-pointer border-gray-200/80 transition-all hover:-translate-y-0.5 hover:border-[#035EF9]/20 hover:shadow-lg hover:shadow-[#0B0F1A]/5" onClick={() => {
+            setSelectedProject(project.id);
+            setDashboardPage("project-detail");
+          }}>
             <CardHeader className="pb-2">
               <div className="flex items-start justify-between">
                 <div className="flex-1 min-w-0">
@@ -125,10 +108,18 @@ export function ProjectsView() {
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setDashboardPage("listing-builder"); }}>
+                    <DropdownMenuItem onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedProject(project.id);
+                      setDashboardPage("project-detail");
+                    }}>
                       <Edit className="mr-2 h-4 w-4" /> Edit
                     </DropdownMenuItem>
-                    <DropdownMenuItem onClick={(e) => e.stopPropagation()}>
+                    <DropdownMenuItem onClick={(e) => {
+                      e.stopPropagation();
+                      updateProject(project.id, { status: "archived" });
+                      toast.success("Project archived");
+                    }}>
                       <Archive className="mr-2 h-4 w-4" /> Archive
                     </DropdownMenuItem>
                     <DropdownMenuItem className="text-red-600" onClick={(e) => { e.stopPropagation(); handleDelete(project.id); }}>
@@ -143,32 +134,41 @@ export function ProjectsView() {
                 {getStatusBadge(project.status)}
                 <div className="flex items-center gap-1 text-xs text-gray-400">
                   <Clock className="h-3 w-3" />
-                  {project.updatedAt}
+                  {new Date(project.updatedAt).toLocaleDateString()}
                 </div>
               </div>
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-1.5 text-xs text-gray-500">
                   <FileText className="h-3 w-3" />
-                  {project.listingCount} listing{project.listingCount !== 1 ? "s" : ""}
+                  {listingCount} listing{listingCount !== 1 ? "s" : ""}
                 </div>
                 <div className="flex items-center gap-1">
                   <div
                     className="w-5 h-5 rounded-md overflow-hidden border"
-                    style={{ borderColor: project.agentColor + "60" }}
+                    style={{ borderColor: agent.color + "60" }}
                   >
                     <img
-                      src={`/agents/${project.agent.toLowerCase()}.png`}
-                      alt={project.agent}
+                      src={agent.avatar}
+                      alt={agent.name}
                       className="w-full h-full object-cover"
                     />
                   </div>
-                  <span className="text-xs text-gray-400">{project.agent}</span>
+                  <span className="text-xs text-gray-400">{agent.name}</span>
                 </div>
               </div>
             </CardContent>
           </Card>
-        ))}
+        )})}
       </div>
+      {filteredProjects.length === 0 && (
+        <Card>
+          <CardContent className="py-12 text-center text-sm text-gray-500">
+            {projects.length === 0
+              ? "No projects yet. Start the Full Listing Workflow and SellerCrew will create one automatically."
+              : "No projects match your search."}
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }
