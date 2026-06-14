@@ -2,6 +2,7 @@ import crypto from "crypto";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { generateAIText, parseAIJson } from "@/lib/ai/providers";
+import { ensureDefaultPolicyKnowledgeBase } from "@/lib/default-policies";
 
 export const POLICY_CATEGORIES = [
   "health_medical_claims",
@@ -77,23 +78,63 @@ Rules:
 - "keywords": terms that would appear in a product listing this rule governs (lowercase).
 - Do not invent rules that are not supported by the document. Do not include commentary.`;
 
+// Split a long document into chunks at newline boundaries so the whole policy
+// is processed, not just the first slice.
+function chunkMarkdown(markdown: string, size = 18_000, maxChunks = 8): string[] {
+  const text = markdown.trim();
+  if (text.length <= size) return [text];
+  const chunks: string[] = [];
+  let start = 0;
+  while (start < text.length && chunks.length < maxChunks) {
+    let end = Math.min(start + size, text.length);
+    if (end < text.length) {
+      const newline = text.lastIndexOf("\n", end);
+      if (newline > start + size * 0.5) end = newline; // prefer a clean break
+    }
+    chunks.push(text.slice(start, end));
+    start = end;
+  }
+  return chunks;
+}
+
 async function extractRules(markdown: string, fileName: string): Promise<ExtractedRule[]> {
-  const result = await generateAIText({
-    system: EXTRACTION_SYSTEM,
-    prompt: `Source file: ${fileName}
+  const chunks = chunkMarkdown(markdown);
+  const collected: ExtractedRule[] = [];
+
+  for (let i = 0; i < chunks.length; i += 1) {
+    const part = chunks.length > 1 ? ` (part ${i + 1} of ${chunks.length})` : "";
+    try {
+      const result = await generateAIText({
+        system: EXTRACTION_SYSTEM,
+        prompt: `Source file: ${fileName}${part}
 
 Policy document:
 """
-${markdown.slice(0, 24_000)}
+${chunks[i]}
 """
 
 Return JSON matching this schema exactly:
 ${JSON.stringify(z.toJSONSchema(extractionSchema))}`,
-    json: true,
-    maxTokens: 8_000,
-  });
-  const parsed = extractionSchema.parse(parseAIJson(result.text));
-  return parsed.rules.map((rule) => ({ ...rule, category: normalizeCategory(rule.category) }));
+        json: true,
+        maxTokens: 8_000,
+      });
+      const parsed = extractionSchema.parse(parseAIJson(result.text));
+      collected.push(...parsed.rules.map((rule) => ({ ...rule, category: normalizeCategory(rule.category) })));
+    } catch {
+      // Skip a chunk that fails extraction rather than failing the whole upload.
+    }
+  }
+
+  // Drop exact duplicates produced across overlapping chunks before storage.
+  const seen = new Set<string>();
+  const unique: ExtractedRule[] = [];
+  for (const rule of collected) {
+    const fingerprint = fingerprintRule(rule.ruleText);
+    if (seen.has(fingerprint)) continue;
+    seen.add(fingerprint);
+    unique.push(rule);
+  }
+  return unique.slice(0, 300);
 }
 
 interface ExistingRuleLite {
@@ -260,6 +301,7 @@ export async function getPolicyContextForSaleem(product: {
   targetAudience?: string;
   keywords?: string[];
 }): Promise<string> {
+  await ensureDefaultPolicyKnowledgeBase();
   const rules = await db.policyRule.findMany({
     where: { status: "active" },
     select: { category: true, title: true, ruleText: true, severity: true, keywords: true },

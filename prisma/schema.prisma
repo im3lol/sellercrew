@@ -20,13 +20,16 @@ model User {
   avatar        String?
   passwordHash  String?
   emailVerified Boolean  @default(false)
-  role          String   @default("user") // user | admin (global app role)
+  role          String   @default("user")
+  accountStatus String   @default("active") @map("account_status") // active | suspended
+  suspendedAt   DateTime? @map("suspended_at")
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
   memberships     OrganizationMember[]
   activityLogs    ActivityLog[]
   ownedOrgs       Organization[]      @relation("OrgOwner")
+  googleDriveConnection GoogleDriveConnection?
 }
 
 // ============================================
@@ -47,6 +50,38 @@ model Organization {
   projects     Project[]
   subscription Subscription?
   credits      Credit?
+  googleDriveSettings GoogleDriveSettings?
+}
+
+model GoogleDriveConnection {
+  id                    String   @id @default(cuid())
+  userId                String   @unique @map("user_id")
+  googleEmail           String?  @map("google_email")
+  encryptedRefreshToken String   @map("encrypted_refresh_token")
+  scope                 String
+  connectedAt           DateTime @default(now()) @map("connected_at")
+  updatedAt             DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model GoogleDriveSettings {
+  id                    String   @id @default(cuid())
+  organizationId        String   @unique @map("organization_id")
+  sheetMode             String   @default("workspace") @map("sheet_mode") // workspace | global
+  imageFolderMode       String   @default("workspace") @map("image_folder_mode") // workspace | global
+  selectedSpreadsheetId String?  @map("selected_spreadsheet_id")
+  selectedSpreadsheetName String? @map("selected_spreadsheet_name")
+  selectedFolderId      String?  @map("selected_folder_id")
+  selectedFolderName    String?  @map("selected_folder_name")
+  rootFolderId          String?  @map("root_folder_id")
+  workspaceFolderId     String?  @map("workspace_folder_id")
+  workspaceSheetId      String?  @map("workspace_sheet_id")
+  autoSync              Boolean  @default(true) @map("auto_sync")
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 }
 
 model OrganizationMember {
@@ -73,6 +108,7 @@ model Subscription {
   status         String   @default("active")  // active, past_due, cancelled, expired
   startDate      DateTime @default(now()) @map("start_date")
   endDate        DateTime? @map("end_date")
+  trialEndsAt    DateTime? @map("trial_ends_at")
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
@@ -248,6 +284,8 @@ model WorkflowRun {
   accuracyScore     Int      @default(0) @map("accuracy_score")
   hallucinationRisk Int      @default(0) @map("hallucination_risk")
   generatedImages   Int      @default(0) @map("generated_images")
+  inputTokens       Int      @default(0) @map("input_tokens")
+  outputTokens      Int      @default(0) @map("output_tokens")
   durationMs        Int      @default(0) @map("duration_ms")
   createdAt         DateTime @default(now())
 

@@ -223,6 +223,7 @@ async function runAgent(options: {
   images?: AIImageInput[];
   final?: boolean;
   policyContext?: string;
+  tokenTotals?: { input: number; output: number };
 }) {
   const step = workflowSteps.find((item) => item.id === options.stepId);
   if (!step) throw new Error(`Unknown workflow step: ${options.stepId}`);
@@ -291,6 +292,11 @@ ${JSON.stringify(z.toJSONSchema(schema))}`;
       })
     );
     structured = parseResponse();
+  }
+
+  if (options.tokenTotals && response.usage) {
+    options.tokenTotals.input += response.usage.inputTokens;
+    options.tokenTotals.output += response.usage.outputTokens;
   }
 
   if (options.final) {
@@ -545,6 +551,8 @@ export async function POST(request: NextRequest) {
       const generatedImages: GeneratedImage[] = [];
       const references = input.uploadedImages.map((image) => ({ dataUrl: image.dataUrl, type: image.type }));
       const startedAt = Date.now();
+      const tokenTotals = { input: 0, output: 0 };
+      const agent = (opts: Parameters<typeof runAgent>[0]) => runAgent({ ...opts, tokenTotals });
 
       const recordRun = async (data: {
         provider?: string;
@@ -569,6 +577,8 @@ export async function POST(request: NextRequest) {
               accuracyScore: Math.round(data.result.scores.accuracyScore),
               hallucinationRisk: Math.round(data.result.qualityReport.hallucinationRisk),
               generatedImages: data.result.generatedImages.length,
+              inputTokens: tokenTotals.input,
+              outputTokens: tokenTotals.output,
               durationMs: Date.now() - startedAt,
             },
           });
@@ -617,8 +627,8 @@ export async function POST(request: NextRequest) {
           // Policy bank is best-effort; Saleem still runs without it.
         }
 
-        await runAgent({ stepId: "ali-intake", input, reports, emit });
-        const rawGate = await runAgent({ stepId: "saleem-gate", input, reports, emit, policyContext }) as AgentReport;
+        await agent({ stepId: "ali-intake", input, reports, emit });
+        const rawGate = await agent({ stepId: "saleem-gate", input, reports, emit, policyContext }) as AgentReport;
         const gate = normalizeInitialGate(rawGate, input);
         if (gate !== rawGate) {
           const gateIndex = reports.findIndex((report) => report.stepId === "saleem-gate");
@@ -635,19 +645,19 @@ export async function POST(request: NextRequest) {
           return;
         }
 
-        await runAgent({ stepId: "noor", input, reports, emit, images: references });
+        await agent({ stepId: "noor", input, reports, emit, images: references });
         await Promise.all([
-          runAgent({ stepId: "raed", input, reports, emit }),
-          runAgent({ stepId: "fares", input, reports, emit }),
+          agent({ stepId: "raed", input, reports, emit }),
+          agent({ stepId: "fares", input, reports, emit }),
         ]);
-        await runAgent({ stepId: "hakim", input, reports, emit });
+        await agent({ stepId: "hakim", input, reports, emit });
         await Promise.all([
-          runAgent({ stepId: "bayan", input, reports, emit }),
-          runAgent({ stepId: "rayan", input, reports, emit }),
+          agent({ stepId: "bayan", input, reports, emit }),
+          agent({ stepId: "rayan", input, reports, emit }),
         ]);
         const [, adam] = await Promise.all([
-          runAgent({ stepId: "nadeem", input, reports, emit }),
-          runAgent({ stepId: "adam", input, reports, emit }),
+          agent({ stepId: "nadeem", input, reports, emit }),
+          agent({ stepId: "adam", input, reports, emit }),
         ]);
 
         if (settings?.features.imageGeneration !== false && adam && "output" in adam) {
@@ -682,9 +692,9 @@ export async function POST(request: NextRequest) {
           emit({ type: "step", stepId: "adam", status: "completed" });
         }
 
-        await runAgent({ stepId: "badr", input, reports, emit });
-        await runAgent({ stepId: "saleem-final", input, reports, emit, policyContext });
-        const final = await runAgent({ stepId: "ali-final", input, reports, emit, final: true });
+        await agent({ stepId: "badr", input, reports, emit });
+        await agent({ stepId: "saleem-final", input, reports, emit, policyContext });
+        const final = await agent({ stepId: "ali-final", input, reports, emit, final: true });
         if (!final || !("result" in final)) throw new Error("Ali did not return a final delivery.");
 
         const result = fullWorkflowResultSchema.parse({
@@ -698,6 +708,19 @@ export async function POST(request: NextRequest) {
       } catch (error) {
         // The run failed before delivering a listing — return the credits.
         await refundCredits(creditCharge, FULL_WORKFLOW_COST);
+        try {
+          await db.workflowRun.create({
+            data: {
+              userId: uid,
+              status: "failed",
+              inputTokens: tokenTotals.input,
+              outputTokens: tokenTotals.output,
+              durationMs: Date.now() - startedAt,
+            },
+          });
+        } catch {
+          // Metrics are best-effort.
+        }
         emit({
           type: "error",
           error: error instanceof Error ? error.message : "The multi-agent workflow failed.",

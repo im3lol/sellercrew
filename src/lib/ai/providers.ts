@@ -1,4 +1,8 @@
-import { getSettings } from "@/lib/settings";
+import {
+  DEFAULT_OPENROUTER_IMAGE_MODELS,
+  DEFAULT_OPENROUTER_TEXT_MODELS,
+  getSettings,
+} from "@/lib/settings";
 
 export interface AIImageInput {
   dataUrl: string;
@@ -20,10 +24,16 @@ interface GenerateAITextOptions {
   onTextDelta?: (delta: string, fullText: string) => void;
 }
 
+export interface AITokenUsage {
+  inputTokens: number;
+  outputTokens: number;
+}
+
 export interface AITextResult {
   provider: "anthropic" | "gemini" | "openrouter";
   model: string;
   text: string;
+  usage?: AITokenUsage;
 }
 
 function dataUrlToBase64(dataUrl: string) {
@@ -129,6 +139,7 @@ async function generateWithAnthropic(options: GenerateAITextOptions, modelOverri
 
   const payload = await response.json() as {
     content?: Array<{ type?: string; text?: string }>;
+    usage?: { input_tokens?: number; output_tokens?: number };
     error?: { message?: string };
   };
   if (!response.ok) {
@@ -142,7 +153,12 @@ async function generateWithAnthropic(options: GenerateAITextOptions, modelOverri
     .trim();
   if (!text) throw new Error("Anthropic returned an empty response.");
 
-  return { provider: "anthropic", model, text };
+  return {
+    provider: "anthropic",
+    model,
+    text,
+    usage: { inputTokens: payload.usage?.input_tokens ?? 0, outputTokens: payload.usage?.output_tokens ?? 0 },
+  };
 }
 
 async function generateWithGemini(options: GenerateAITextOptions, modelOverride?: string): Promise<AITextResult> {
@@ -219,6 +235,7 @@ async function generateWithGemini(options: GenerateAITextOptions, modelOverride?
 
   const payload = await response.json() as {
     candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
+    usageMetadata?: { promptTokenCount?: number; candidatesTokenCount?: number };
     error?: { message?: string };
   };
   if (!response.ok) {
@@ -231,14 +248,22 @@ async function generateWithGemini(options: GenerateAITextOptions, modelOverride?
     .trim();
   if (!text) throw new Error("Gemini returned an empty response.");
 
-  return { provider: "gemini", model, text };
+  return {
+    provider: "gemini",
+    model,
+    text,
+    usage: {
+      inputTokens: payload.usageMetadata?.promptTokenCount ?? 0,
+      outputTokens: payload.usageMetadata?.candidatesTokenCount ?? 0,
+    },
+  };
 }
 
 async function generateWithOpenRouter(options: GenerateAITextOptions, modelOverride?: string): Promise<AITextResult> {
   const apiKey = process.env.OPENROUTER_API_KEY;
   if (!apiKey) throw new Error("OpenRouter is not configured.");
 
-  const model = modelOverride || process.env.OPENROUTER_WORKFLOW_MODEL || "google/gemini-2.5-flash";
+  const model = modelOverride || process.env.OPENROUTER_WORKFLOW_MODEL || "qwen/qwen3.7-plus";
   const messages = [
     {
       role: "system",
@@ -259,28 +284,47 @@ async function generateWithOpenRouter(options: GenerateAITextOptions, modelOverr
     },
   ];
 
-  const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-      "HTTP-Referer": process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000",
-      "X-Title": "SellerCrew",
-    },
-    body: JSON.stringify({
-      model,
-      messages,
-      temperature: 0.2,
-      max_tokens: options.maxTokens ?? 2_000,
-    }),
-    signal: AbortSignal.timeout(110_000),
-  });
-
-  const payload = await response.json() as {
+  type OpenRouterPayload = {
     model?: string;
-    choices?: Array<{ message?: { content?: string | null } }>;
+    choices?: Array<{ message?: { content?: string | null; images?: Array<{ image_url?: { url?: string } }> } }>;
+    usage?: { prompt_tokens?: number; completion_tokens?: number };
     error?: { message?: string };
   };
+  const request = async (maxTokens: number) => {
+    const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+        "HTTP-Referer": process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000",
+        "X-Title": "SellerCrew",
+      },
+      body: JSON.stringify({
+        model,
+        messages,
+        temperature: 0.2,
+        max_tokens: maxTokens,
+        ...(options.json ? { response_format: { type: "json_object" } } : {}),
+        reasoning: { effort: "none" },
+      }),
+      signal: AbortSignal.timeout(110_000),
+    });
+    return {
+      response,
+      payload: await response.json() as OpenRouterPayload,
+    };
+  };
+
+  let maxTokens = Math.min(options.maxTokens ?? 2_000, 2_000);
+  let { response, payload } = await request(maxTokens);
+  if (!response.ok) {
+    const message = payload.error?.message || "";
+    const affordable = message.match(/can only afford\s+(\d+)/i);
+    if (affordable) {
+      maxTokens = Math.max(256, Math.min(maxTokens - 1, Number(affordable[1]) - 64));
+      ({ response, payload } = await request(maxTokens));
+    }
+  }
   if (!response.ok) {
     throw new Error(payload.error?.message || `OpenRouter request failed (${response.status}).`);
   }
@@ -289,7 +333,37 @@ async function generateWithOpenRouter(options: GenerateAITextOptions, modelOverr
   if (!text) throw new Error("OpenRouter returned an empty response.");
 
   options.onTextDelta?.(text, text);
-  return { provider: "openrouter", model: payload.model || model, text };
+  return {
+    provider: "openrouter",
+    model: payload.model || model,
+    text,
+    usage: { inputTokens: payload.usage?.prompt_tokens ?? 0, outputTokens: payload.usage?.completion_tokens ?? 0 },
+  };
+}
+
+function uniqueModels(models: Array<string | undefined>): string[] {
+  return [...new Set(models.map((model) => model?.trim()).filter((model): model is string => Boolean(model)))];
+}
+
+async function generateWithOpenRouterTextModels(
+  options: GenerateAITextOptions,
+  models: Array<string | undefined>
+): Promise<AITextResult> {
+  const imageOnlyModels = new Set<string>(DEFAULT_OPENROUTER_IMAGE_MODELS);
+  const chain = uniqueModels(models).filter((model) => !imageOnlyModels.has(model));
+  const errors: string[] = [];
+
+  for (const model of chain) {
+    try {
+      return await generateWithOpenRouter(options, model);
+    } catch (error) {
+      errors.push(`${model}: ${error instanceof Error ? error.message : "request failed"}`);
+    }
+  }
+
+  throw new Error(errors.length
+    ? `OpenRouter text models failed. ${errors.join(" ")}`
+    : "No OpenRouter text model is configured.");
 }
 
 export async function generateAIText(options: GenerateAITextOptions): Promise<AITextResult> {
@@ -301,7 +375,10 @@ export async function generateAIText(options: GenerateAITextOptions): Promise<AI
   const runners: Record<string, () => Promise<AITextResult>> = {
     anthropic: () => generateWithAnthropic(options, models?.anthropic),
     gemini: () => generateWithGemini(options, models?.gemini),
-    openrouter: () => generateWithOpenRouter(options, models?.openrouter),
+    openrouter: () => generateWithOpenRouterTextModels(options, [
+      models?.openrouter,
+      ...(models?.openrouterTextFallbacks ?? DEFAULT_OPENROUTER_TEXT_MODELS.slice(1)),
+    ]),
   };
 
   let chain = order.filter((key) => key in runners);
@@ -355,18 +432,67 @@ function repairTruncatedJson(input: string): string {
   return repaired;
 }
 
+function extractJsonCandidate(input: string): string {
+  const objectStart = input.indexOf("{");
+  const arrayStart = input.indexOf("[");
+  const starts = [objectStart, arrayStart].filter((index) => index >= 0);
+  if (!starts.length) return input;
+  return input.slice(Math.min(...starts));
+}
+
+function removeTrailingCommas(input: string): string {
+  let output = "";
+  let inString = false;
+  let escaped = false;
+
+  for (let index = 0; index < input.length; index += 1) {
+    const char = input[index];
+    if (inString) {
+      output += char;
+      if (escaped) escaped = false;
+      else if (char === "\\") escaped = true;
+      else if (char === '"') inString = false;
+      continue;
+    }
+
+    if (char === '"') {
+      inString = true;
+      output += char;
+      continue;
+    }
+
+    if (char === ",") {
+      let next = index + 1;
+      while (next < input.length && /\s/.test(input[next])) next += 1;
+      if (input[next] === "}" || input[next] === "]") continue;
+    }
+    output += char;
+  }
+
+  return output;
+}
+
 export function parseAIJson(text: string): unknown {
   const normalized = text
     .replace(/^```(?:json)?\s*/i, "")
     .replace(/\s*```$/, "")
     .trim();
-  try {
-    return JSON.parse(normalized);
-  } catch (error) {
+
+  const candidates = [
+    normalized,
+    extractJsonCandidate(normalized),
+    removeTrailingCommas(extractJsonCandidate(normalized)),
+    removeTrailingCommas(repairTruncatedJson(extractJsonCandidate(normalized))),
+  ];
+  let firstError: unknown;
+
+  for (const candidate of [...new Set(candidates)]) {
     try {
-      return JSON.parse(repairTruncatedJson(normalized));
-    } catch {
-      throw error;
+      return JSON.parse(candidate);
+    } catch (error) {
+      firstError ??= error;
     }
   }
+
+  throw firstError;
 }
