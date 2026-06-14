@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ClipboardEvent } from "react";
 import { agents } from "@/lib/agents";
+import { FULL_WORKFLOW_COST } from "@/lib/credits";
 import { useAppStore } from "@/lib/store";
 import { useDashboardStore } from "@/lib/dashboard-store";
 import {
@@ -67,6 +68,30 @@ const emptyInput: ProductInput = {
   uploadedImages: [],
 };
 
+function formattedClipboardText(event: ClipboardEvent<HTMLTextAreaElement>): string {
+  const plainText = event.clipboardData.getData("text/plain").replace(/\r\n?/g, "\n");
+  const html = event.clipboardData.getData("text/html");
+  if (!html) return plainText;
+
+  const document = new DOMParser().parseFromString(html, "text/html");
+  document.querySelectorAll("br").forEach((element) => element.replaceWith("\n"));
+  document.querySelectorAll("li").forEach((element) => {
+    element.prepend("• ");
+    element.append("\n");
+  });
+  document.querySelectorAll("p, div, section, article, h1, h2, h3, h4, h5, h6, tr").forEach((element) => {
+    element.append("\n");
+  });
+
+  const structured = (document.body.textContent || "")
+    .replace(/\u00a0/g, " ")
+    .replace(/[ \t]+\n/g, "\n")
+    .replace(/\n[ \t]+/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+  return structured.includes("\n") || !plainText.includes("\n") ? structured : plainText;
+}
+
 const workflowActivityCopy: Record<(typeof workflowSteps)[number]["id"], { title: string; detail: string }> = {
   "ali-intake": {
     title: "Reviewing your product data",
@@ -105,8 +130,8 @@ const workflowActivityCopy: Record<(typeof workflowSteps)[number]["id"], { title
     detail: "Planning the image sequence, messages, and creative concepts that support the product story.",
   },
   adam: {
-    title: "Preparing image production prompts",
-    detail: "Converting the approved visual plan into detailed, production-ready image prompts.",
+    title: "Producing the approved listing images",
+    detail: "Converting Rayan's plan into strict prompts and generating each image in order while preserving the exact uploaded product.",
   },
   badr: {
     title: "Running the quality review",
@@ -152,6 +177,7 @@ async function createAssetPreview(dataUrl: string) {
 
 export function FullWorkflow() {
   const setDashboardPage = useAppStore((state) => state.setDashboardPage);
+  const activeWorkspace = useAppStore((state) => state.activeWorkspace);
   const {
     projects,
     selectedProjectId,
@@ -272,7 +298,9 @@ export function FullWorkflow() {
       return toast.error("Add the product name, brand, and a detailed description of at least 30 characters.");
     }
     if (!input.uploadedImages.length) return toast.error("Upload at least one clear product image.");
-    if (creditsBalance < 150) return toast.error("You need 150 credits to run the full workflow.");
+    if (creditsBalance < FULL_WORKFLOW_COST) {
+      return toast.error(`You need ${FULL_WORKFLOW_COST} credits to run the full workflow.`);
+    }
 
     const payload: ProductInput = {
       ...input,
@@ -364,7 +392,8 @@ export function FullWorkflow() {
       setResultProvider(data.provider ?? null);
       setActiveStep(workflowSteps.length - 1);
       setActiveTab("delivery");
-      if (["anthropic", "gemini", "openai", "openrouter"].includes(data.provider)) consumeCredits(150);
+      // Credits are deducted authoritatively on the server; resync the real balance.
+      void useAppStore.getState().bootstrap();
       if (parsed.policyStatus.status !== "blocked") {
         saveListing({
           projectId: activeProject.id,
@@ -422,6 +451,48 @@ export function FullWorkflow() {
         })
       );
       addAssets([...customerAssetPreviews, ...generatedAssetPreviews]);
+
+      if (activeWorkspace?.id) {
+        fetch("/api/google-drive/sync", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({
+            workspaceId: activeWorkspace.id,
+            projectId: activeProject.id,
+            workspaceName: activeWorkspace.name,
+            productName: payload.productName,
+            brandName: payload.brandName,
+            marketplace: payload.marketplace,
+            category: payload.category,
+            status: parsed.policyStatus.status,
+            title: parsed.listingContent.title,
+            bullets: parsed.listingContent.bulletPoints,
+            description: parsed.listingContent.description,
+            keywords: parsed.listingContent.backendSearchTerms,
+            complianceScore: parsed.scores.complianceScore,
+            customerImages: payload.uploadedImages.map((image) => ({
+              name: image.name,
+              dataUrl: image.dataUrl,
+            })),
+            generatedImages: parsed.generatedImages.map((image) => ({
+              name: `${payload.productName} - ${image.purpose}.png`,
+              dataUrl: image.dataUrl,
+            })),
+          }),
+        })
+          .then(async (syncResponse) => {
+            const syncData = await syncResponse.json().catch(() => null);
+            if (!syncResponse.ok) {
+              throw new Error(syncData?.error || "Google Drive sync failed.");
+            }
+            if (syncResponse.ok && !syncData?.skipped) toast.success("Product backed up to Google Drive.");
+          })
+          .catch((syncError) => {
+            toast.warning(syncError instanceof Error ? syncError.message : "Google Drive sync failed.");
+          });
+      }
+
       toast.success(
         ["anthropic", "gemini", "openai", "openrouter"].includes(data.provider)
           ? "Full SellerCrew workflow completed."
@@ -521,12 +592,28 @@ export function FullWorkflow() {
                     <Label htmlFor="description">Detailed product description</Label>
                     <Textarea
                       id="description"
-                      className="min-h-52"
+                      className="min-h-52 whitespace-pre-wrap leading-6"
                       placeholder="Write all confirmed product details: what it is, features, benefits, materials, measurements, package contents, compatibility, use cases, target customer, care instructions, and anything important a buyer should know."
                       value={input.description}
                       onChange={(event) => updateInput("description", event.target.value)}
+                      onPaste={(event) => {
+                        const text = formattedClipboardText(event);
+                        if (!text) return;
+                        event.preventDefault();
+                        const field = event.currentTarget;
+                        const start = field.selectionStart;
+                        const end = field.selectionEnd;
+                        updateInput(
+                          "description",
+                          `${input.description.slice(0, start)}${text}${input.description.slice(end)}`
+                        );
+                        requestAnimationFrame(() => {
+                          const cursor = start + text.length;
+                          field.setSelectionRange(cursor, cursor);
+                        });
+                      }}
                     />
-                    <p className="text-xs text-gray-500">Be detailed and factual. Avoid unsupported medical claims, guarantees, rankings, or features the product does not have.</p>
+                    <p className="text-xs text-gray-500">Pasted paragraphs, headings, and bullet lists keep their structure. Be detailed and factual, and avoid unsupported claims.</p>
                   </div>
                   <div className="space-y-3 sm:col-span-2">
                     <div>
@@ -655,9 +742,9 @@ export function FullWorkflow() {
               <Card>
                 <CardHeader><CardTitle>Workflow cost</CardTitle></CardHeader>
                 <CardContent className="space-y-4">
-                  <p className="text-xs leading-5 text-gray-500">SellerCrew automatically uses Claude when available, then Gemini as the fallback.</p>
+                  <p className="text-xs leading-5 text-gray-500">SellerCrew uses the configured OpenRouter text chain and a separate image-only fallback chain for Adam.</p>
                   <div className="flex items-end justify-between">
-                    <div><p className="text-3xl font-bold">150</p><p className="text-xs text-gray-500">credits per full run</p></div>
+                    <div><p className="text-3xl font-bold">{FULL_WORKFLOW_COST}</p><p className="text-xs text-gray-500">credits per full run</p></div>
                     <Badge variant="outline">{creditsBalance.toLocaleString()} available</Badge>
                   </div>
                   <Button className="w-full" onClick={runWorkflow} disabled={isRunning}>

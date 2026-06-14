@@ -16,6 +16,10 @@ export const AGENT_CREDITS: Record<string, number> = {
 
 export const FULL_GENERATION_COST = Object.values(AGENT_CREDITS).reduce((a, b) => a + b, 0); // 95
 
+// Single source of truth for the full multi-agent workflow cost. Used by both
+// the client (display + soft pre-check) and the server (authoritative charge).
+export const FULL_WORKFLOW_COST = 150;
+
 export const SUBSCRIPTION_PLANS = {
   starter: {
     name: 'Starter',

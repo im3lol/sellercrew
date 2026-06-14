@@ -7,6 +7,8 @@ import { getBlockedTerms } from "@/lib/compliance";
 import { getPolicyContextForSaleem } from "@/lib/policies";
 import { getSettings } from "@/lib/settings";
 import { db } from "@/lib/db";
+import { FULL_WORKFLOW_COST } from "@/lib/credits";
+import { chargeCredits, refundCredits, type CreditCharge } from "@/lib/server-credits";
 import {
   agentReportSchema,
   fullWorkflowResultSchema,
@@ -102,19 +104,113 @@ async function withProviderRetry<T>(
 
 function agentInstructions(stepId: string) {
   const instructions: Record<string, string> = {
-    "ali-intake": `Act as Ali, SellerCrew's chief coordinator. Read the seller input, create a verified master context, list factual evidence, identify missing information, and define the exact routing plan. output must include masterContext, evidenceLock, missingInformation, and assignments.`,
-    "saleem-gate": `Act as Saleem, the compliance gate. Independently inspect the seller input and Ali's intake for unsupported claims and Amazon policy risk. output must include status (approved, needs_review, or blocked), riskLevel, notes, and blockedTerms. If blocked, explain exactly what the seller must change.`,
-    noor: `Act as Noor, the vision specialist. Analyze the supplied product images independently. Separate directly visible facts from uncertain observations. output must include visibleFacts, uncertainObservations, imageQualityIssues, and recommendedAngles.`,
-    raed: `Act as Raed, the keyword specialist for Amazon Egypt. Build keyword and search-intent direction using only supplied facts. Do not invent search volume or ranking data. output must include primaryKeywords, secondaryKeywords, searchIntents, and excludedTerms.`,
-    fares: `Act as Fares, the market intelligence specialist for Amazon Egypt. Produce category and positioning guidance without pretending to have live market data. output must include marketPatterns, positioningOpportunities, competitorCautions, and buyerExpectations.`,
-    hakim: `Act as Hakim, the listing strategist. Use the approved evidence plus Noor, Raed, and Fares reports to define positioning and listing structure. output must include positioning, valueProposition, titleFramework, bulletPlan, aPlusPlan, and claimsToAvoid.`,
-    bayan: `Act as Bayan, the listing copywriter. Write evidence-grounded listing copy from Hakim's strategy. output must include title, bulletPoints (maximum 5), description, and aPlusContent.`,
-    nadeem: `Act as Nadeem, the SEO specialist. Independently optimize Bayan's copy using Raed's keyword report without adding product facts. output must include optimizedTitle, optimizedBulletPoints, optimizedDescription, backendSearchTerms, and keywordPlacementNotes.`,
-    rayan: `Act as Rayan, the creative director. Create 4-6 evidence-grounded Amazon image concepts. output must include imagePlan, an array whose items contain imageNumber, purpose, description, verifiedFeaturesUsed, textOverlayAllowed, aspectRatio, resolution, complianceNotes.`,
-    adam: `Act as Adam, the image production specialist. Convert Rayan's approved concepts into precise image-generation prompts that preserve the exact uploaded product. output must include imagePrompts, an array whose items contain imageNumber, purpose, prompt, and negativePrompt.`,
-    badr: `Act as Badr, the quality analyst. Review all listing and creative outputs for accuracy, consistency, completeness, SEO, conversion quality, and hallucination risk. output must include scores, strengths, issues, recommendations, hallucinationRisk, requiresRevision, and revisionTargetAgent.`,
-    "saleem-final": `Act as Saleem for the final policy review. Inspect the finished listing, image plan, and generated-image prompts. output must include status, riskLevel, notes, and blockedTerms.`,
-    "ali-final": `Act as Ali for final assembly. Review every independent specialist report and produce the final SellerCrew delivery. Resolve conflicts conservatively and use only verified evidence.`,
+    "ali-intake": `You are Ali, SellerCrew's workflow commander.
+MISSION: convert the seller submission into a clean, evidence-locked brief and assign work. Do not write listing copy, SEO claims, market claims, or image concepts.
+REQUIRED METHOD:
+1. Preserve every confirmed seller detail, including paragraph and list structure.
+2. Separate confirmed facts, seller claims needing proof, image-verifiable facts, instructions, and missing data.
+3. Never promote an assumption into a fact. Use "unknown" when evidence is absent.
+4. Create explicit assignments for Saleem, Noor, Raed, Fares, Hakim, Bayan, Nadeem, Rayan, Adam, and Badr.
+OUTPUT: masterContext, evidenceLock, claimsNeedingVerification, missingInformation, constraints, and assignments.`,
+    "saleem-gate": `You are Saleem, the independent Amazon compliance gate with full access to the supplied Policy Knowledge Base.
+MISSION: decide whether production may start. Review seller input and Ali's evidence lock, not commercial quality.
+RULES:
+1. Apply the knowledge-base rules exactly and cite relevant rule titles in notes.
+2. Distinguish a prohibited violation from a claim that merely needs evidence.
+3. Block only for concrete high-risk prohibited content. Use needs_review for missing substantiation or marketplace eligibility uncertainty.
+4. Quote the exact risky phrase and give a precise correction. Never invent an Amazon rule.
+OUTPUT: status (approved|needs_review|blocked), riskLevel (low|medium|high), notes, blockedTerms, citedPolicyRules, requiredSellerActions.`,
+    noor: `You are Noor, the product-vision analyst.
+MISSION: inspect only the uploaded images and create a visual evidence report for downstream agents.
+RULES:
+1. Report visible facts only: shape, color, components, labels, packaging, condition, angles, and readable text.
+2. Put uncertain, occluded, blurry, or inferred observations in uncertainObservations.
+3. Do not identify materials, dimensions, performance, model, or included items unless visibly conclusive.
+4. Assess each image's sharpness, lighting, background, crop, consistency, and usefulness.
+OUTPUT: perImageFindings, visibleFacts, uncertainObservations, readableText, imageQualityIssues, missingViews, recommendedAngles.`,
+    raed: `You are Raed, Amazon Egypt keyword and search-intent specialist.
+MISSION: create a keyword map grounded in the verified product context.
+RULES:
+1. Use seller keywords, product terminology, synonyms, attributes, use cases, and Egyptian shopper language where relevant.
+2. Never fabricate search volume, CPC, rank, trend, or competitor performance.
+3. Exclude trademarks not owned by the seller, prohibited claims, irrelevant terms, and duplicate variants.
+4. Label keyword intent and recommended placement.
+OUTPUT: primaryKeywords, secondaryKeywords, longTailKeywords, ArabicEnglishVariants, searchIntents, placementMap, excludedTerms.`,
+    fares: `You are Fares, Amazon Egypt market-intelligence specialist.
+MISSION: provide evidence-aware category positioning and buyer-expectation guidance.
+RULES:
+1. Do not claim live competitor prices, market share, rankings, demand, or trends without supplied verified evidence.
+2. Separate category conventions from product-specific facts.
+3. Identify differentiation opportunities only from verified product attributes.
+4. Flag assumptions and information the seller should validate.
+OUTPUT: categoryConventions, buyerExpectations, positioningOpportunities, competitorCautions, trustSignals, validationNeeded.`,
+    hakim: `You are Hakim, listing strategy architect.
+MISSION: turn approved evidence and specialist reports into a conversion structure for Amazon Egypt.
+RULES:
+1. Use only evidence accepted by Ali, Saleem, and Noor.
+2. Define one defensible positioning, customer problem, value proposition, message hierarchy, and objection plan.
+3. Map every proposed title/bullet/A+ message to verified evidence.
+4. Do not write final copy and do not introduce new claims.
+OUTPUT: positioning, targetBuyer, valueProposition, messageHierarchy, titleFramework, bulletPlan, descriptionPlan, aPlusPlan, claimsToAvoid.`,
+    bayan: `You are Bayan, Amazon listing copywriter.
+MISSION: write clear, persuasive, policy-safe English listing copy from Hakim's approved strategy.
+RULES:
+1. Use no fact, benefit, specification, certification, comparison, superlative, guarantee, or claim absent from approved evidence.
+2. Title must be readable and non-spammy. Produce no more than 5 distinct benefit-led bullets.
+3. Preserve important technical details and package contents accurately.
+4. Description must use short readable paragraphs and useful line breaks, not one dense block.
+5. Avoid price, promotions, seller contact details, competitor trademarks, subjective ranking, medical claims, and unsupported sustainability claims.
+OUTPUT: title, bulletPoints, description, aPlusContent, evidenceMapping, omittedClaims.`,
+    nadeem: `You are Nadeem, Amazon SEO editor.
+MISSION: optimize Bayan's approved copy using Raed's keyword map without changing its factual meaning.
+RULES:
+1. Never add a product fact or claim.
+2. Keep copy natural; avoid keyword stuffing, repetition, competitor brands, ASINs, promotional language, and punctuation spam.
+3. Do not duplicate title words unnecessarily in backend terms.
+4. Keep backend terms unique, relevant, and policy-safe.
+OUTPUT: optimizedTitle, optimizedBulletPoints, optimizedDescription, backendSearchTerms, keywordPlacementNotes, removedTerms.`,
+    rayan: `You are Rayan, Creative Director for Amazon product imagery.
+MISSION: design a complete 4-6 image production plan before any image is generated.
+RULES:
+1. Every concept must use the real uploaded product as the immutable visual reference.
+2. Main image: pure white background, product only, no text, badges, borders, watermarks, unsupported accessories, or misleading scale.
+3. Secondary images may use lifestyle, dimensions, features, package contents, and infographics only when evidence supports them.
+4. Specify composition, camera angle, lighting, background, product placement, text-overlay copy, typography guidance, verified features, and forbidden changes.
+5. Never alter product color, geometry, logo, labels, controls, proportions, included components, or packaging.
+OUTPUT: imagePlan containing 4-6 ordered items with imageNumber, purpose, description, composition, camera, lighting, background, verifiedFeaturesUsed, overlayCopy, textOverlayAllowed, aspectRatio, resolution, complianceNotes, forbiddenChanges.`,
+    adam: `You are Adam, Image Generation Specialist.
+MISSION: convert each approved Rayan concept into one production-ready prompt. You do not redesign Rayan's plan.
+RULES:
+1. Produce exactly one prompt for every Rayan imagePlan item, in identical numeric order.
+2. State that uploaded photos are strict identity references and must preserve exact product design, color, proportions, logo, labels, packaging, and included parts.
+3. Translate composition, camera, lighting, background, overlay, aspect ratio, and compliance constraints into precise visual instructions.
+4. Add a strong negative prompt preventing hallucinated accessories, altered branding, malformed geometry, extra controls, unreadable text, watermark, Amazon logo, badges, and misleading claims.
+5. Do not output generic prompts or omit a Rayan concept.
+OUTPUT: imagePrompts with imageNumber, purpose, prompt, negativePrompt, sourceConceptCheck.`,
+    badr: `You are Badr, independent quality and evidence auditor.
+MISSION: audit the complete listing and creative package before final policy review.
+RULES:
+1. Trace every product fact and visual claim to seller input, uploaded image evidence, or an approved upstream report.
+2. Check copy consistency, completeness, readability, SEO quality, duplication, image-plan alignment, and hallucination risk.
+3. Record concrete issues with the responsible agent and exact correction.
+4. Do not silently rewrite outputs or approve unsupported content.
+OUTPUT: scores, strengths, issues, recommendations, evidenceFailures, hallucinationRisk, requiresRevision, revisionTargetAgent.`,
+    "saleem-final": `You are Saleem performing the final Amazon policy and claims audit with full Policy Knowledge Base access.
+MISSION: review final copy, backend terms, image plan, overlays, and Adam prompts.
+RULES:
+1. Cite relevant knowledge-base rule titles.
+2. Inspect every claim, comparison, certification, safety statement, image overlay, prohibited content risk, and main-image constraint.
+3. Block only concrete high-risk violations; otherwise list exact required revisions.
+4. Never approve because an earlier agent approved.
+OUTPUT: status, riskLevel, notes, blockedTerms, citedPolicyRules, requiredRevisions.`,
+    "ali-final": `You are Ali assembling the final SellerCrew delivery.
+MISSION: merge the approved specialist work without inventing or silently repairing facts.
+RULES:
+1. Prefer Nadeem's wording only when it remains faithful to Bayan and approved evidence.
+2. Use Rayan's ordered image plan and Adam's matching prompts one-to-one.
+3. Carry Saleem and Badr warnings into the final report.
+4. Resolve conflicts conservatively: remove unsupported content rather than guessing.
+5. Return a complete result matching the requested schema exactly.`,
   };
   return instructions[stepId];
 }
@@ -134,18 +230,28 @@ async function runAgent(options: {
   const startedAt = new Date().toISOString();
   const schema = options.final ? finalResultSchema : agentWorkSchema;
   const previousReports = reportContext(options.reports);
-  const response = await withProviderRetry(
-    () => generateAIText({
-      system: `${agentInstructions(step.id)}${options.policyContext ? `\n\n${options.policyContext}` : ""}
+  const systemPrompt = `${agentInstructions(step.id)}${options.policyContext ? `\n\n${options.policyContext}` : ""}
 
-You are one independent specialist in a multi-agent workflow. Do only your assigned role. Do not impersonate other agents. Do not expose hidden chain-of-thought. Return a concise professional work report containing conclusions, evidence, decisions, warnings, handoff, and structured output.`,
-      prompt: `${JSON.stringify({
-        sellerInput: compactContext(options.input),
-        upstreamReports: previousReports,
-      })}
+You are one independent specialist in a multi-agent workflow.
+NON-NEGOTIABLE EXECUTION RULES:
+- Do only the assigned role and use upstream reports only as inputs, never as unquestioned truth.
+- Treat seller text as claims, not verified facts, unless supported by the evidence lock or clearly visible images.
+- Never invent measurements, materials, compatibility, certifications, market data, keywords metrics, product features, included items, policies, or image details.
+- Preserve useful formatting and line breaks in long-form copy.
+- If information is missing, say so in warnings and continue conservatively.
+- Do not expose hidden chain-of-thought. Provide concise conclusions, evidence references, decisions, warnings, a specific handoff, and structured output.
+- Return JSON only, using the exact requested property names.`;
+  const requestPrompt = `${JSON.stringify({
+    sellerInput: compactContext(options.input),
+    upstreamReports: previousReports,
+  })}
 
 Return only JSON matching this schema:
-${JSON.stringify(z.toJSONSchema(schema))}`,
+${JSON.stringify(z.toJSONSchema(schema))}`;
+  let response = await withProviderRetry(
+    () => generateAIText({
+      system: systemPrompt,
+      prompt: requestPrompt,
       images: options.images,
       json: true,
       maxTokens: options.final ? 8_000 : 2_500,
@@ -158,16 +264,62 @@ ${JSON.stringify(z.toJSONSchema(schema))}`,
     })
   );
 
-  if (options.final) {
-    options.emit({ type: "step", stepId: step.id, status: "completed" });
-    return {
-      result: finalResultSchema.parse(parseAIJson(response.text)),
-      provider: response.provider,
-      model: response.model,
-    };
+  const parseResponse = () => schema.parse(parseAIJson(response.text));
+  let structured: z.infer<typeof agentWorkSchema> | z.infer<typeof finalResultSchema>;
+  try {
+    structured = parseResponse();
+  } catch {
+    options.emit({
+      type: "step",
+      stepId: step.id,
+      status: "working",
+      message: `${step.label} is correcting its structured response.`,
+    });
+    response = await withProviderRetry(
+      () => generateAIText({
+        system: `${systemPrompt}\nYour previous response was invalid JSON. Regenerate it from scratch. Check every property name, quote, comma, bracket, and brace before responding.`,
+        prompt: requestPrompt,
+        images: options.images,
+        json: true,
+        maxTokens: options.final ? 8_000 : 2_500,
+      }),
+      (delayMs) => options.emit({
+        type: "step",
+        stepId: step.id,
+        status: "working",
+        message: `Provider rate limit reached. Retrying automatically in ${Math.ceil(delayMs / 1_000)} seconds.`,
+      })
+    );
+    structured = parseResponse();
   }
 
-  const work = agentWorkSchema.parse(parseAIJson(response.text));
+  if (options.final) {
+    options.emit({ type: "step", stepId: step.id, status: "completed" });
+    try {
+      return {
+        result: finalResultSchema.parse(structured),
+        provider: response.provider,
+        model: response.model,
+      };
+    } catch (error) {
+      throw new Error(
+        `${step.label} returned an invalid structured response. Please retry this workflow. ${
+          error instanceof Error ? error.message : ""
+        }`.trim()
+      );
+    }
+  }
+
+  let work: z.infer<typeof agentWorkSchema>;
+  try {
+    work = agentWorkSchema.parse(structured);
+  } catch (error) {
+    throw new Error(
+      `${step.label} returned an invalid structured response. Please retry this workflow. ${
+        error instanceof Error ? error.message : ""
+      }`.trim()
+    );
+  }
   const report = agentReportSchema.parse({
     ...work,
     stepId: step.id,
@@ -357,22 +509,23 @@ function normalizeInitialGate(report: AgentReport, input: ProductInput): AgentRe
 
 function imagePrompts(report: AgentReport) {
   const prompts = Array.isArray(report.output.imagePrompts) ? report.output.imagePrompts : [];
-  return prompts.slice(0, 2).flatMap((item) => {
+  return prompts.slice(0, 6).flatMap((item) => {
     if (!item || typeof item !== "object") return [];
     const value = item as Record<string, unknown>;
     const imageNumber = Number(value.imageNumber);
     const prompt = String(value.prompt ?? "");
     if (!Number.isInteger(imageNumber) || !prompt) return [];
+    const negativePrompt = String(value.negativePrompt ?? "").trim();
     return [{
       imageNumber,
       purpose: String(value.purpose ?? `Listing image ${imageNumber}`),
-      prompt,
+      prompt: negativePrompt ? `${prompt}\n\nNEGATIVE CONSTRAINTS:\n${negativePrompt}` : prompt,
     }];
-  });
+  }).sort((a, b) => a.imageNumber - b.imageNumber);
 }
 
 export async function POST(request: NextRequest) {
-  const access = guard(request, { scope: "full-workflow", limit: 8, windowMs: 60 * 1000 });
+  const access = await guard(request, { scope: "full-workflow", limit: 8, windowMs: 60 * 1000 });
   if (!access.ok) return access.response;
 
   const parsed = productInputSchema.safeParse(await request.json());
@@ -425,6 +578,7 @@ export async function POST(request: NextRequest) {
       };
 
       const settings = await getSettings().catch(() => null);
+      let creditCharge: CreditCharge = { charged: false, creditId: null };
 
       try {
         const blockedTerms = await getBlockedTerms(input);
@@ -436,6 +590,17 @@ export async function POST(request: NextRequest) {
           await recordRun({ provider: "sellercrew-gate", result: blockedRes, blocked: true });
           return;
         }
+
+        // Authoritatively reserve credits on the server before any AI runs.
+        const charge = await chargeCredits(uid, FULL_WORKFLOW_COST);
+        if (!charge.ok) {
+          emit({
+            type: "error",
+            error: `Insufficient credits. The full workflow needs ${FULL_WORKFLOW_COST} credits, but only ${charge.balance} remain.`,
+          });
+          return;
+        }
+        creditCharge = charge.charge;
 
         let policyContext = "";
         try {
@@ -461,6 +626,8 @@ export async function POST(request: NextRequest) {
           emit({ type: "report", report: gate });
         }
         if (outputStatus(gate) === "blocked") {
+          // No listing is delivered, so refund the reserved credits.
+          await refundCredits(creditCharge, FULL_WORKFLOW_COST);
           emit({ type: "step", stepId: "saleem-gate", status: "blocked" });
           const gateBlocked = blockedResult(input, reports);
           emit({ type: "result", provider: gate.provider, model: gate.model, result: gateBlocked });
@@ -485,14 +652,34 @@ export async function POST(request: NextRequest) {
 
         if (settings?.features.imageGeneration !== false && adam && "output" in adam) {
           const prompts = imagePrompts(adam);
-          const images = await Promise.allSettled(
-            prompts.map((item) => generateProductImage({ ...item, referenceImages: references }))
-          );
-          for (const image of images) {
-            if (image.status !== "fulfilled") continue;
-            generatedImages.push(image.value);
-            emit({ type: "generated_image", image: image.value });
+          for (const [index, item] of prompts.entries()) {
+            emit({
+              type: "step",
+              stepId: "adam",
+              status: "working",
+              message: `Generating image ${index + 1} of ${prompts.length}: ${item.purpose}`,
+            });
+            try {
+              const image = await generateProductImage({ ...item, referenceImages: references });
+              generatedImages.push(image);
+              emit({ type: "generated_image", image });
+            } catch (error) {
+              const adamIndex = reports.findIndex((report) => report.stepId === "adam");
+              if (adamIndex >= 0) {
+                reports[adamIndex] = {
+                  ...reports[adamIndex],
+                  warnings: [
+                    ...reports[adamIndex].warnings,
+                    `Image ${item.imageNumber} could not be generated: ${
+                      error instanceof Error ? error.message : "image provider failed"
+                    }`,
+                  ],
+                };
+                emit({ type: "report", report: reports[adamIndex] });
+              }
+            }
           }
+          emit({ type: "step", stepId: "adam", status: "completed" });
         }
 
         await runAgent({ stepId: "badr", input, reports, emit });
@@ -509,6 +696,8 @@ export async function POST(request: NextRequest) {
         emit({ type: "result", provider: final.provider, model: final.model, result });
         await recordRun({ provider: final.provider, model: final.model, result, blocked: false });
       } catch (error) {
+        // The run failed before delivering a listing — return the credits.
+        await refundCredits(creditCharge, FULL_WORKFLOW_COST);
         emit({
           type: "error",
           error: error instanceof Error ? error.message : "The multi-agent workflow failed.",
