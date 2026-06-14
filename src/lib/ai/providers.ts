@@ -3,6 +3,7 @@ import {
   DEFAULT_OPENROUTER_TEXT_MODELS,
   getSettings,
 } from "@/lib/settings";
+import { getSecret } from "@/lib/secrets";
 
 export interface AIImageInput {
   dataUrl: string;
@@ -71,7 +72,7 @@ async function readSSE(
 }
 
 async function generateWithAnthropic(options: GenerateAITextOptions, modelOverride?: string): Promise<AITextResult> {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
+  const apiKey = await getSecret("ANTHROPIC_API_KEY");
   if (!apiKey) throw new Error("Anthropic is not configured.");
 
   const model = modelOverride || process.env.ANTHROPIC_MODEL || "claude-sonnet-4-6";
@@ -162,7 +163,7 @@ async function generateWithAnthropic(options: GenerateAITextOptions, modelOverri
 }
 
 async function generateWithGemini(options: GenerateAITextOptions, modelOverride?: string): Promise<AITextResult> {
-  const apiKey = process.env.GEMINI_API_KEY;
+  const apiKey = await getSecret("GEMINI_API_KEY");
   if (!apiKey) throw new Error("Gemini is not configured.");
 
   const model = modelOverride || process.env.GEMINI_MODEL || "gemini-2.5-flash";
@@ -260,7 +261,7 @@ async function generateWithGemini(options: GenerateAITextOptions, modelOverride?
 }
 
 async function generateWithOpenRouter(options: GenerateAITextOptions, modelOverride?: string): Promise<AITextResult> {
-  const apiKey = process.env.OPENROUTER_API_KEY;
+  const apiKey = await getSecret("OPENROUTER_API_KEY");
   if (!apiKey) throw new Error("OpenRouter is not configured.");
 
   const model = modelOverride || process.env.OPENROUTER_WORKFLOW_MODEL || "qwen/qwen3.7-plus";

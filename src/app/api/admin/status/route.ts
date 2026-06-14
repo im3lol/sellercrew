@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { requireAdmin } from "@/lib/api-guard";
 import { getSettings } from "@/lib/settings";
+import { getSecret } from "@/lib/secrets";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -20,12 +21,18 @@ export async function GET(request: NextRequest) {
     dbOk = false;
   }
 
-  // ── Provider configuration (keys live in env) ──
+  // ── Provider configuration (admin-managed secrets, env fallback) ──
+  const [anthropicKey, geminiKey, openrouterKey, openaiKey] = await Promise.all([
+    getSecret("ANTHROPIC_API_KEY"),
+    getSecret("GEMINI_API_KEY"),
+    getSecret("OPENROUTER_API_KEY"),
+    getSecret("OPENAI_API_KEY"),
+  ]);
   const providers = [
-    { id: "anthropic", label: "Anthropic (Claude)", configured: !!process.env.ANTHROPIC_API_KEY, model: settings.models.anthropic },
-    { id: "gemini", label: "Google Gemini", configured: !!process.env.GEMINI_API_KEY, model: settings.models.gemini },
-    { id: "openrouter", label: "OpenRouter", configured: !!process.env.OPENROUTER_API_KEY, model: settings.models.openrouter },
-    { id: "openai", label: "OpenAI", configured: !!process.env.OPENAI_API_KEY, model: settings.models.openai },
+    { id: "anthropic", label: "Anthropic (Claude)", configured: !!anthropicKey, model: settings.models.anthropic },
+    { id: "gemini", label: "Google Gemini", configured: !!geminiKey, model: settings.models.gemini },
+    { id: "openrouter", label: "OpenRouter", configured: !!openrouterKey, model: settings.models.openrouter },
+    { id: "openai", label: "OpenAI", configured: !!openaiKey, model: settings.models.openai },
   ];
 
   // ── Entity counts ──

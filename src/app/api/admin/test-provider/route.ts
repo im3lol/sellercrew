@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { requireAdmin } from "@/lib/api-guard";
 import { rateLimit } from "@/lib/rate-limit";
+import { getSecret } from "@/lib/secrets";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -14,8 +15,8 @@ async function testProvider(provider: string): Promise<{ ok: boolean; message: s
   const timeout = AbortSignal.timeout(15_000);
   try {
     if (provider === "anthropic") {
-      const key = process.env.ANTHROPIC_API_KEY;
-      if (!key) return { ok: false, message: "ANTHROPIC_API_KEY is not set." };
+      const key = await getSecret("ANTHROPIC_API_KEY");
+      if (!key) return { ok: false, message: "Anthropic API key is not set." };
       const res = await fetch("https://api.anthropic.com/v1/models", {
         headers: { "x-api-key": key, "anthropic-version": "2023-06-01" },
         signal: timeout,
@@ -25,16 +26,16 @@ async function testProvider(provider: string): Promise<{ ok: boolean; message: s
         : { ok: false, message: `Anthropic returned ${res.status}.` };
     }
     if (provider === "gemini") {
-      const key = process.env.GEMINI_API_KEY;
-      if (!key) return { ok: false, message: "GEMINI_API_KEY is not set." };
+      const key = await getSecret("GEMINI_API_KEY");
+      if (!key) return { ok: false, message: "Gemini API key is not set." };
       const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(key)}`, { signal: timeout });
       return res.ok
         ? { ok: true, message: "Key valid — Gemini reachable." }
         : { ok: false, message: `Gemini returned ${res.status} (quota or key issue).` };
     }
     if (provider === "openrouter") {
-      const key = process.env.OPENROUTER_API_KEY;
-      if (!key) return { ok: false, message: "OPENROUTER_API_KEY is not set." };
+      const key = await getSecret("OPENROUTER_API_KEY");
+      if (!key) return { ok: false, message: "OpenRouter API key is not set." };
       const res = await fetch("https://openrouter.ai/api/v1/key", {
         headers: { Authorization: `Bearer ${key}` },
         signal: timeout,
@@ -48,8 +49,8 @@ async function testProvider(provider: string): Promise<{ ok: boolean; message: s
       };
     }
     if (provider === "openai") {
-      const key = process.env.OPENAI_API_KEY;
-      if (!key) return { ok: false, message: "OPENAI_API_KEY is not set." };
+      const key = await getSecret("OPENAI_API_KEY");
+      if (!key) return { ok: false, message: "OpenAI API key is not set." };
       const res = await fetch("https://api.openai.com/v1/models", {
         headers: { Authorization: `Bearer ${key}` },
         signal: timeout,
@@ -68,7 +69,7 @@ export async function POST(request: NextRequest) {
   const access = await requireAdmin(request);
   if (!access.ok) return access.response;
 
-  const limited = rateLimit(`test-provider:${access.session.uid}`, 20, 60 * 1000);
+  const limited = rateLimit(`test-provider:${access.session.email}`, 20, 60 * 1000);
   if (!limited.ok) {
     return NextResponse.json({ error: `Slow down. Try again in ${limited.retryAfterSeconds}s.` }, { status: 429 });
   }
