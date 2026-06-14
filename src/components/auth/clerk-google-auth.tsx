@@ -1,56 +1,53 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { useAuth, useSignIn, useSignUp } from "@clerk/nextjs";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
-import { useAppStore } from "@/lib/store";
 import { Button } from "@/components/ui/button";
 
+function clerkErrorMessage(error: unknown, fallback: string): string {
+  const clerkError = error as { errors?: Array<{ message?: string; longMessage?: string }> };
+  return (
+    clerkError?.errors?.[0]?.longMessage ||
+    clerkError?.errors?.[0]?.message ||
+    (error instanceof Error ? error.message : fallback)
+  );
+}
+
 function ClerkGoogleAuthEnabled({ mode }: { mode: "sign-in" | "sign-up" }) {
+  // isSignedIn only drives the button label here; turning a Clerk session into a
+  // SellerCrew session is handled globally by <ClerkSessionSync> so it runs no
+  // matter which view the OAuth redirect lands on.
   const { isLoaded, isSignedIn } = useAuth();
   const { signIn } = useSignIn();
   const { signUp } = useSignUp();
-  const applyAccount = useAppStore((state) => state.applyAccount);
-  const synced = useRef(false);
   const [redirecting, setRedirecting] = useState(false);
-
-  useEffect(() => {
-    if (!isLoaded || !isSignedIn || synced.current) return;
-    synced.current = true;
-    fetch("/api/auth/clerk-sync", { method: "POST", credentials: "include" })
-      .then(async (response) => {
-        const data = await response.json().catch(() => null);
-        if (!response.ok) throw new Error(data?.error || "Could not finish Google sign-in.");
-        applyAccount(data);
-      })
-      .catch((error) => {
-        synced.current = false;
-        toast.error(error instanceof Error ? error.message : "Could not finish Google sign-in.");
-      });
-  }, [applyAccount, isLoaded, isSignedIn]);
 
   const continueWithGoogle = async () => {
     if (redirecting) return;
     setRedirecting(true);
     try {
+      // Clerk's "future" SSO API (what useSignIn/useSignUp expose in this version):
+      // redirectUrl = where to land once SSO completes; redirectCallbackUrl = the
+      // route that finishes the OAuth handshake (/sso-callback).
       const params = {
         strategy: "oauth_google",
         redirectUrl: "/",
         redirectCallbackUrl: "/sso-callback",
       } as const;
 
-      const result =
-        mode === "sign-up"
-          ? await signUp.sso(params)
-          : await signIn.sso(params);
-
-      if (result.error) {
-        throw result.error;
+      if (mode === "sign-up") {
+        if (!signUp) throw new Error("Google sign-in is still loading. Please try again.");
+        await signUp.sso(params);
+      } else {
+        if (!signIn) throw new Error("Google sign-in is still loading. Please try again.");
+        await signIn.sso(params);
       }
+      // On success the browser redirects away; nothing else to do here.
     } catch (error) {
       setRedirecting(false);
-      toast.error(error instanceof Error ? error.message : "Could not start Google sign-in.");
+      toast.error(clerkErrorMessage(error, "Could not start Google sign-in."));
     }
   };
 
