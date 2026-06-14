@@ -28,7 +28,6 @@ model User {
   updatedAt     DateTime @updatedAt
 
   memberships     OrganizationMember[]
-  activityLogs    ActivityLog[]
   ownedOrgs       Organization[]      @relation("OrgOwner")
   googleDriveConnection GoogleDriveConnection?
 }
@@ -143,7 +142,6 @@ model Project {
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   listings     Listing[]
-  agentRuns    AgentRun[]
 }
 
 model Listing {
@@ -160,66 +158,11 @@ model Listing {
   updatedAt   DateTime @updatedAt
 
   project     Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  assets      Asset[]
-  generations Generation[]
 }
 
-model Asset {
-  id        String   @id @default(cuid())
-  listingId String   @map("listing_id")
-  fileUrl   String   @map("file_url")
-  type      String   // image, video, document, infographic
-  createdAt DateTime @default(now())
-
-  listing Listing @relation(fields: [listingId], references: [id], onDelete: Cascade)
-}
-
-// ============================================
-// AI AGENTS & GENERATIONS
-// ============================================
-
-model Generation {
-  id        String   @id @default(cuid())
-  listingId String   @map("listing_id")
-  agentId   String   @map("agent_id")
-  input     String?
-  output    String?
-  tokens    Int      @default(0)
-  cost      Int      @default(0) // credits consumed
-  model     String?
-  duration  Int      @default(0) // milliseconds
-  createdAt DateTime @default(now())
-
-  listing Listing @relation(fields: [listingId], references: [id], onDelete: Cascade)
-}
-
-model AgentRun {
-  id          String    @id @default(cuid())
-  projectId   String    @map("project_id")
-  agent       String    // agent id (ali, raed, fares, etc.)
-  status      String    @default("pending") // pending, running, completed, failed
-  input       String?
-  output      String?
-  startedAt   DateTime? @map("started_at")
-  finishedAt  DateTime? @map("finished_at")
-  createdAt   DateTime  @default(now())
-
-  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
-}
-
-// ============================================
-// ACTIVITY LOGS
-// ============================================
-
-model ActivityLog {
-  id        String   @id @default(cuid())
-  userId    String   @map("user_id")
-  action    String
-  metadata  String?  // JSON string
-  createdAt DateTime @default(now())
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-}
+// Removed dead models Asset / Generation / AgentRun / ActivityLog — they were
+// defined but never written by any code (assets, activity, and run history are
+// client-side; workflow metrics live in WorkflowRun). See docs/OPEN_DECISIONS.
 
 // ============================================
 // POLICY KNOWLEDGE BASE (Saleem's compliance memory)
@@ -308,6 +251,10 @@ model WorkflowJob {
   events    String   @default("[]") // JSON array of progress events
   result    String?  // JSON FullWorkflowResult
   error     String?
+  // Credit lifecycle (so a crashed/stranded job can be refunded by the reaper).
+  creditId  String?  @map("credit_id")
+  charged   Boolean  @default(false)
+  refunded  Boolean  @default(false)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

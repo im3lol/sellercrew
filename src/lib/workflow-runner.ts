@@ -533,13 +533,26 @@ function imagePrompts(report: AgentReport) {
 export interface RunWorkflowOptions {
   userId: string;
   emit: (event: ProgressEvent) => void;
+  /** Called once, right after credits are reserved (lets the caller persist the
+   *  charge so a crashed job can be refunded by the reaper). */
+  onCharge?: (charge: CreditCharge) => void | Promise<void>;
+  /** Called once, right after the reserved credits are refunded (block/fail). */
+  onRefund?: () => void | Promise<void>;
+}
+
+// Validate/normalize a result against the schema without throwing: the success
+// path uses .parse(), but blocked/deterministic results must never crash the run,
+// so we normalize when valid and fall back to the constructed object otherwise.
+function normalizeResult(result: FullWorkflowResult): FullWorkflowResult {
+  const parsed = fullWorkflowResultSchema.safeParse(result);
+  return parsed.success ? (parsed.data as FullWorkflowResult) : result;
 }
 
 /**
  * Runs the full multi-agent workflow, emitting progress events. Shared by the
  * streaming route (emit -> SSE) and the BullMQ worker (emit -> DB job).
  */
-export async function runWorkflow(input: ProductInput, { userId: uid, emit }: RunWorkflowOptions): Promise<void> {
+export async function runWorkflow(input: ProductInput, { userId: uid, emit, onCharge, onRefund }: RunWorkflowOptions): Promise<void> {
       const reports: AgentReport[] = [];
       const generatedImages: GeneratedImage[] = [];
       const references = input.uploadedImages.map((image) => ({ dataUrl: image.dataUrl, type: image.type }));
@@ -588,7 +601,7 @@ export async function runWorkflow(input: ProductInput, { userId: uid, emit }: Ru
         if (blockedTerms.length) {
           emit({ type: "step", stepId: "ali-intake", status: "completed" });
           emit({ type: "step", stepId: "saleem-gate", status: "blocked" });
-          const blockedRes = deterministicBlockedResult(input, blockedTerms);
+          const blockedRes = normalizeResult(deterministicBlockedResult(input, blockedTerms));
           emit({ type: "result", provider: "sellercrew-gate", result: blockedRes });
           await recordRun({ provider: "sellercrew-gate", result: blockedRes, blocked: true });
           return;
@@ -604,6 +617,9 @@ export async function runWorkflow(input: ProductInput, { userId: uid, emit }: Ru
           return;
         }
         creditCharge = charge.charge;
+        // Persist the charge (e.g. on the job row) before the long agent work, so
+        // a crash mid-run can still be refunded by the reaper.
+        if (creditCharge.charged) await onCharge?.(creditCharge);
 
         let policyContext = "";
         try {
@@ -631,8 +647,9 @@ export async function runWorkflow(input: ProductInput, { userId: uid, emit }: Ru
         if (outputStatus(gate) === "blocked") {
           // No listing is delivered, so refund the reserved credits.
           await refundCredits(creditCharge, FULL_WORKFLOW_COST);
+          await onRefund?.();
           emit({ type: "step", stepId: "saleem-gate", status: "blocked" });
-          const gateBlocked = blockedResult(input, reports);
+          const gateBlocked = normalizeResult(blockedResult(input, reports));
           emit({ type: "result", provider: gate.provider, model: gate.model, result: gateBlocked });
           await recordRun({ provider: gate.provider, model: gate.model, result: gateBlocked, blocked: true });
           return;
@@ -701,6 +718,7 @@ export async function runWorkflow(input: ProductInput, { userId: uid, emit }: Ru
       } catch (error) {
         // The run failed before delivering a listing — return the credits.
         await refundCredits(creditCharge, FULL_WORKFLOW_COST);
+        await onRefund?.();
         try {
           await db.workflowRun.create({
             data: {

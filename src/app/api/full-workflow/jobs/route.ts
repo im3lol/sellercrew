@@ -30,7 +30,13 @@ export async function POST(request: NextRequest) {
 
   try {
     const queue = await getWorkflowQueue();
-    await queue.add("workflow", { jobId: job.id }, { removeOnComplete: 50, removeOnFail: 50 });
+    // attempts: 1 — never auto-retry: a re-run would re-charge credits (the charge
+    // lives inside the workflow). Stranded/crashed jobs are handled by the reaper.
+    await queue.add(
+      "workflow",
+      { jobId: job.id },
+      { attempts: 1, removeOnComplete: 50, removeOnFail: 50 }
+    );
   } catch (error) {
     await db.workflowJob.update({ where: { id: job.id }, data: { status: "failed", error: "Could not enqueue the job." } });
     return NextResponse.json(
