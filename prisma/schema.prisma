@@ -149,10 +149,13 @@ model Project {
 model Listing {
   id          String   @id @default(cuid())
   projectId   String   @map("project_id")
+  productName String?  @map("product_name")
   title       String?
+  bullets     String   @default("[]") // JSON array of strings
   description String?
+  keywords    String   @default("[]") // JSON array of strings
   status      String   @default("draft") // draft, generated, reviewed, published
-  score       Int      @default(0)
+  score       Int      @default(0) // compliance score
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 

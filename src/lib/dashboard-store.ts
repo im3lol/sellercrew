@@ -63,6 +63,7 @@ interface DashboardDataState {
   creditsUsed: number;
   plan: "starter" | "pro" | "agency";
   loadProjects: () => Promise<void>;
+  loadListings: () => Promise<void>;
   createProject: (name: string) => DashboardProject;
   updateProject: (id: string, patch: Partial<DashboardProject>) => void;
   deleteProject: (id: string) => void;
@@ -187,23 +188,30 @@ export const useDashboardStore = create<DashboardDataState>()(
 
       setSelectedProject: (selectedProjectId) => set({ selectedProjectId }),
 
+      loadListings: async () => {
+        try {
+          const res = await fetch("/api/listings", { credentials: "include" });
+          if (!res.ok) return;
+          const data = await res.json();
+          if (Array.isArray(data.listings)) set({ listings: data.listings as DashboardListing[] });
+        } catch {
+          // Offline / not signed in — keep cached listings.
+        }
+      },
+
       saveListing: (listing) => {
         const timestamp = new Date().toISOString();
         const existing = get().listings.find(
           (item) => item.projectId === listing.projectId && item.productName === listing.productName
         );
+        const id = existing?.id ?? crypto.randomUUID();
         set((state) => ({
           listings: existing
             ? state.listings.map((item) =>
                 item.id === existing.id ? { ...item, ...listing, updatedAt: timestamp } : item
               )
             : [
-                {
-                  ...listing,
-                  id: crypto.randomUUID(),
-                  createdAt: timestamp,
-                  updatedAt: timestamp,
-                },
+                { ...listing, id, createdAt: timestamp, updatedAt: timestamp },
                 ...state.listings,
               ],
           projects: state.projects.map((project) =>
@@ -212,21 +220,49 @@ export const useDashboardStore = create<DashboardDataState>()(
               : project
           ),
         }));
+        void fetch("/api/listings", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            id,
+            projectId: listing.projectId,
+            productName: listing.productName,
+            title: listing.title,
+            bullets: listing.bullets,
+            description: listing.description,
+            keywords: listing.keywords,
+            complianceScore: listing.complianceScore,
+            status: listing.status,
+          }),
+        }).catch(() => {});
+        void fetch("/api/projects", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id: listing.projectId, status: "active" }),
+        }).catch(() => {});
       },
 
-      updateListingStatus: (id, status) =>
+      updateListingStatus: (id, status) => {
         set((state) => ({
           listings: state.listings.map((listing) =>
             listing.id === id
               ? { ...listing, status, updatedAt: new Date().toISOString() }
               : listing
           ),
-        })),
+        }));
+        void fetch("/api/listings", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id, status }),
+        }).catch(() => {});
+      },
 
-      deleteListing: (id) =>
+      deleteListing: (id) => {
         set((state) => ({
           listings: state.listings.filter((listing) => listing.id !== id),
-        })),
+        }));
+        void fetch(`/api/listings?id=${encodeURIComponent(id)}`, { method: "DELETE" }).catch(() => {});
+      },
 
       addAssets: (assets) =>
         set((state) => ({
@@ -303,8 +339,9 @@ export const useDashboardStore = create<DashboardDataState>()(
         const normalizedPlan: DashboardDataState["plan"] =
           plan === "pro" || plan === "agency" ? plan : plan === "enterprise" ? "agency" : "starter";
         set({ creditsBalance: balance, creditsUsed: used, plan: normalizedPlan });
-        // Projects are now server-backed; load the authoritative list.
+        // Projects and listings are server-backed; load the authoritative lists.
         void get().loadProjects();
+        void get().loadListings();
       },
 
       switchWorkspace: (workspaceId) =>
