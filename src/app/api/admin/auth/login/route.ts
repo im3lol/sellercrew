@@ -15,7 +15,7 @@ const schema = z.object({
 });
 
 export async function POST(request: NextRequest) {
-  const limited = rateLimit(`admin-login:${clientIp(request)}`, 5, 15 * 60 * 1000);
+  const limited = await rateLimit(`admin-login:${clientIp(request)}`, 5, 15 * 60 * 1000);
   if (!limited.ok) {
     return NextResponse.json(
       { error: `Too many attempts. Try again in ${limited.retryAfterSeconds} seconds.` },

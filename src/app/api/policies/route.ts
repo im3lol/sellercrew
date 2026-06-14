@@ -62,7 +62,7 @@ export async function POST(request: NextRequest) {
   const access = await requireAdmin(request);
   if (!access.ok) return access.response;
 
-  const limited = rateLimit(`policy-upload:${access.session.email}`, 10, 5 * 60 * 1000);
+  const limited = await rateLimit(`policy-upload:${access.session.email}`, 10, 5 * 60 * 1000);
   if (!limited.ok) {
     return NextResponse.json(
       { error: `Too many uploads. Try again in ${limited.retryAfterSeconds} seconds.` },
