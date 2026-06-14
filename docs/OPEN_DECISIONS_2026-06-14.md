@@ -55,7 +55,20 @@ Coordinate with the Docker setup so both use `migrate deploy` afterward.
 
 ---
 
-## D3. Source of truth for assets / activities / workflow runs (product decision)
+## D3. Source of truth for assets / activities / workflow runs — RESOLVED (option B)
+
+> **Decision taken (2026-06-14): option B.** The dead models `Asset`, `Generation`,
+> `AgentRun`, `ActivityLog` were removed from `schema.prisma` (they were never
+> written; the empty tables were dropped via `db push --accept-data-loss`), and the
+> admin report no longer counts them. Assets/activities/run-history remain
+> client-side for now; workflow metrics live in `WorkflowRun`. If collaboration /
+> multi-device becomes a requirement later, revisit with option A below.
+
+---
+
+### (original analysis)
+
+## D3 (analysis). Source of truth for assets / activities / workflow runs
 
 **State:** `projects` and `listings` are server-backed (Postgres). But `assets`,
 `activities`, and `workflowRuns` live only in the browser (`dashboard-store`
