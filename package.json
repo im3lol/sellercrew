@@ -14,7 +14,11 @@
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:deploy": "prisma migrate deploy",
-    "db:reset": "prisma migrate reset"
+    "db:reset": "prisma migrate reset",
+    "docker:up": "docker compose up -d",
+    "docker:rebuild": "docker compose up -d --build",
+    "docker:down": "docker compose down",
+    "docker:logs": "docker compose logs -f app worker"
   },
   "dependencies": {
     "@clerk/nextjs": "^7.5.2",

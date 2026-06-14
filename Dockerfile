@@ -10,7 +10,7 @@ RUN bun install --frozen-lockfile
 
 FROM base AS builder
 COPY --from=dependencies /app/node_modules ./node_modules
-COPY package.json bun.lock tsconfig.json next.config.ts postcss.config.mjs ./
+COPY package.json bun.lock tsconfig.json next.config.ts postcss.config.mjs vitest.config.ts ./
 COPY prisma ./prisma
 RUN bunx prisma generate
 COPY public ./public
@@ -47,6 +47,9 @@ ENV NODE_ENV=production
 COPY --from=dependencies /app/node_modules ./node_modules
 COPY package.json bun.lock tsconfig.json ./
 COPY prisma ./prisma
+# Generate the Prisma client into the worker image — the worker hits the DB at
+# runtime (and the reaper at boot), so the client must be present, not a stub.
+RUN bunx prisma generate
 COPY src ./src
 USER bun
 CMD ["bun", "src/worker.ts"]
