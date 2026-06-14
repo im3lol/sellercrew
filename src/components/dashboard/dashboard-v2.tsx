@@ -91,7 +91,6 @@ import {
   Loader2,
   Menu,
 } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
 
 // ─── Module Imports ─────────────────────────────────────────────────────────
 // Only the default Home page is eager. Every other page is code-split with
@@ -229,12 +228,7 @@ function PlaceholderPage({
   mockItems?: { label: string; value: string; status?: 'active' | 'pending' | 'completed' }[];
 }) {
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 12 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.3 }}
-      className="space-y-6 max-w-7xl"
-    >
+    <div className="space-y-6 max-w-7xl animate-in fade-in slide-in-from-bottom-2 duration-300">
       {/* Header */}
       <div className="flex items-start gap-4">
         <div
@@ -305,7 +299,7 @@ function PlaceholderPage({
           </CardContent>
         </Card>
       )}
-    </motion.div>
+    </div>
   );
 }
 
@@ -690,11 +684,8 @@ export function DashboardV2() {
           />
         )}
         {/* ── Sidebar ──────────────────────────────────────────────────── */}
-        <motion.aside
-          initial={false}
-          animate={{ width: sidebarWidth }}
-          transition={{ duration: 0.25, ease: [0.4, 0, 0.2, 1] }}
-          className={`fixed inset-y-0 left-0 z-20 flex h-full flex-col overflow-hidden border-r border-gray-200/80 bg-white shadow-xl transition-transform md:translate-x-0 md:shadow-none ${
+        <aside
+          className={`fixed inset-y-0 left-0 z-20 flex h-full flex-col overflow-hidden border-r border-gray-200/80 bg-white shadow-xl transition-[width,transform] duration-300 ease-in-out md:translate-x-0 md:shadow-none ${
             mobileSidebarOpen ? 'translate-x-0' : '-translate-x-full'
           }`}
           style={{ width: sidebarWidth }}
@@ -707,19 +698,11 @@ export function DashboardV2() {
                   <img src="/agents/ali.png" alt="SellerCrew" className="size-full object-cover" />
                 </div>
               </div>
-              <AnimatePresence>
-                {sidebarOpen && (
-                  <motion.span
-                    className="text-xl font-extrabold tracking-[-0.055em] text-[#07101f]"
-                    initial={{ opacity: 0, width: 0 }}
-                    animate={{ opacity: 1, width: 'auto' }}
-                    exit={{ opacity: 0, width: 0 }}
-                    transition={{ duration: 0.2 }}
-                  >
-                    sellercrew
-                  </motion.span>
-                )}
-              </AnimatePresence>
+              {sidebarOpen && (
+                <span className="truncate text-xl font-extrabold tracking-[-0.055em] text-[#07101f] animate-in fade-in duration-200">
+                  sellercrew
+                </span>
+              )}
             </div>
             <Tooltip>
               <TooltipTrigger asChild>
@@ -756,25 +739,17 @@ export function DashboardV2() {
                       </span>
                     )}
                   </div>
-                  <AnimatePresence>
-                    {sidebarOpen && (
-                      <motion.div
-                        className="flex-1 min-w-0"
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        transition={{ duration: 0.15 }}
-                      >
-                        <p className="text-sm font-medium text-[#0B0F1A] truncate">
-                          {activeWorkspace?.name || 'Select Workspace'}
-                        </p>
-                        <p className="text-[10px] text-gray-400 truncate">
-                          {activeWorkspace?.label ||
-                            (activeWorkspace?.purpose === 'category' ? 'Category workspace' : 'Account workspace')}
-                        </p>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
+                  {sidebarOpen && (
+                    <div className="flex-1 min-w-0 animate-in fade-in duration-150">
+                      <p className="text-sm font-medium text-[#0B0F1A] truncate">
+                        {activeWorkspace?.name || 'Select Workspace'}
+                      </p>
+                      <p className="text-[10px] text-gray-400 truncate">
+                        {activeWorkspace?.label ||
+                          (activeWorkspace?.purpose === 'category' ? 'Category workspace' : 'Account workspace')}
+                      </p>
+                    </div>
+                  )}
                   {sidebarOpen && (
                     <ChevronDown className="h-3.5 w-3.5 text-gray-400 shrink-0" />
                   )}
@@ -829,14 +804,8 @@ export function DashboardV2() {
                 return (
                   <div key={group.label} className="mb-3">
                     {/* Group Label */}
-                    <AnimatePresence>
-                      {sidebarOpen && (
-                        <motion.div
-                          initial={{ opacity: 0, height: 0 }}
-                          animate={{ opacity: 1, height: 'auto' }}
-                          exit={{ opacity: 0, height: 0 }}
-                          transition={{ duration: 0.15 }}
-                        >
+                    {sidebarOpen && (
+                        <div className="animate-in fade-in duration-150">
                           {group.collapsible ? (
                             <button
                               type="button"
@@ -859,20 +828,12 @@ export function DashboardV2() {
                               {group.label}
                             </p>
                           )}
-                        </motion.div>
+                        </div>
                       )}
-                    </AnimatePresence>
 
                     {/* Nav Items */}
-                    <AnimatePresence initial={false}>
-                      {(!sidebarOpen || !groupCollapsed) && (
-                        <motion.div
-                          initial={sidebarOpen ? { height: 0, opacity: 0 } : false}
-                          animate={{ height: 'auto', opacity: 1 }}
-                          exit={{ height: 0, opacity: 0 }}
-                          transition={{ duration: 0.18, ease: 'easeOut' }}
-                          className="overflow-hidden"
-                        >
+                    {(!sidebarOpen || !groupCollapsed) && (
+                        <div className="overflow-hidden">
                     {group.items.map((item) => {
                       const isActive = dashboardPage === item.page;
                       const navBtn = (
@@ -894,25 +855,13 @@ export function DashboardV2() {
                               isActive ? 'text-[#035EF9]' : ''
                             }`}
                           />
-                          <AnimatePresence>
-                            {sidebarOpen && (
-                              <motion.span
-                                className="truncate"
-                                initial={{ opacity: 0, width: 0 }}
-                                animate={{ opacity: 1, width: 'auto' }}
-                                exit={{ opacity: 0, width: 0 }}
-                                transition={{ duration: 0.15 }}
-                              >
-                                {item.label}
-                              </motion.span>
-                            )}
-                          </AnimatePresence>
+                          {sidebarOpen && (
+                            <span className="truncate animate-in fade-in duration-150">
+                              {item.label}
+                            </span>
+                          )}
                           {isActive && sidebarOpen && (
-                            <motion.div
-                              layoutId="activeIndicator"
-                              className="ml-auto w-1.5 h-1.5 rounded-full bg-[#035EF9]"
-                              transition={{ type: 'spring', stiffness: 350, damping: 30 }}
-                            />
+                            <div className="ml-auto w-1.5 h-1.5 rounded-full bg-[#035EF9]" />
                           )}
                         </button>
                       );
@@ -931,16 +880,15 @@ export function DashboardV2() {
 
                       return navBtn;
                     })}
-                        </motion.div>
+                        </div>
                       )}
-                    </AnimatePresence>
                   </div>
                 );
               })}
             </nav>
           </ScrollArea>
 
-        </motion.aside>
+        </aside>
 
         {/* ── Main Area ────────────────────────────────────────────────── */}
         <div
