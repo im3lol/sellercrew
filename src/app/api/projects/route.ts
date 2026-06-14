@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
-import { getSession } from "@/lib/auth";
-import { getPrimaryOrgId } from "@/lib/account";
+import { requireOrg } from "@/lib/api-guard";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -49,17 +48,9 @@ const patchSchema = z.object({
   agentId: z.string().trim().max(40).optional(),
 });
 
-async function resolveOrg(request: NextRequest) {
-  const session = getSession(request);
-  if (!session) return { error: NextResponse.json({ error: "Authentication required." }, { status: 401 }) };
-  const organizationId = await getPrimaryOrgId(session.uid);
-  if (!organizationId) return { error: NextResponse.json({ error: "No workspace found." }, { status: 404 }) };
-  return { organizationId };
-}
-
 export async function GET(request: NextRequest) {
-  const ctx = await resolveOrg(request);
-  if (ctx.error) return ctx.error;
+  const ctx = await requireOrg(request, { scope: "projects-get", limit: 120, windowMs: 60_000 });
+  if (!ctx.ok) return ctx.response;
   const projects = await db.project.findMany({
     where: { organizationId: ctx.organizationId },
     orderBy: { createdAt: "desc" },
@@ -68,8 +59,8 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const ctx = await resolveOrg(request);
-  if (ctx.error) return ctx.error;
+  const ctx = await requireOrg(request, { scope: "projects-post", limit: 60, windowMs: 60_000 });
+  if (!ctx.ok) return ctx.response;
   const parsed = createSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: "Invalid project." }, { status: 400 });
 
@@ -111,8 +102,8 @@ export async function POST(request: NextRequest) {
 }
 
 export async function PATCH(request: NextRequest) {
-  const ctx = await resolveOrg(request);
-  if (ctx.error) return ctx.error;
+  const ctx = await requireOrg(request, { scope: "projects-patch", limit: 60, windowMs: 60_000 });
+  if (!ctx.ok) return ctx.response;
   const parsed = patchSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: "Invalid update." }, { status: 400 });
 
@@ -125,8 +116,8 @@ export async function PATCH(request: NextRequest) {
 }
 
 export async function DELETE(request: NextRequest) {
-  const ctx = await resolveOrg(request);
-  if (ctx.error) return ctx.error;
+  const ctx = await requireOrg(request, { scope: "projects-delete", limit: 60, windowMs: 60_000 });
+  if (!ctx.ok) return ctx.response;
   const id = request.nextUrl.searchParams.get("id");
   if (!id) return NextResponse.json({ error: "Missing project id." }, { status: 400 });
   await db.project.deleteMany({ where: { id, organizationId: ctx.organizationId } });

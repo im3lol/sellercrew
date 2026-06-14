@@ -1,10 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAdminSession, getSession, type AdminSessionPayload, type SessionPayload } from "@/lib/auth";
 import { rateLimit } from "@/lib/rate-limit";
+import { getPrimaryOrgId } from "@/lib/account";
 import { db } from "@/lib/db";
 
 export type GuardResult =
   | { ok: true; session: SessionPayload }
+  | { ok: false; response: NextResponse };
+
+export type OrgGuardResult =
+  | { ok: true; session: SessionPayload; organizationId: string }
   | { ok: false; response: NextResponse };
 
 export type AdminGuardResult =
@@ -53,6 +58,23 @@ export async function guard(request: NextRequest, options: GuardOptions): Promis
   }
 
   return { ok: true, session };
+}
+
+/**
+ * Like `guard`, but also resolves the caller's primary workspace. Replaces the
+ * per-route `resolveOrg` helpers and adds the rate limiting they were missing.
+ */
+export async function requireOrg(request: NextRequest, options: GuardOptions): Promise<OrgGuardResult> {
+  const access = await guard(request, options);
+  if (!access.ok) return access;
+  const organizationId = await getPrimaryOrgId(access.session.uid);
+  if (!organizationId) {
+    return {
+      ok: false,
+      response: NextResponse.json({ error: "No workspace found." }, { status: 404 }),
+    };
+  }
+  return { ok: true, session: access.session, organizationId };
 }
 
 /**
