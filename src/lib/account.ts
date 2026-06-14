@@ -1,5 +1,15 @@
 import { db } from "@/lib/db";
 
+/** The user's primary (earliest-joined) organization id, or null. */
+export async function getPrimaryOrgId(userId: string): Promise<string | null> {
+  const membership = await db.organizationMember.findFirst({
+    where: { userId },
+    orderBy: { joinedAt: "asc" },
+    select: { organizationId: true },
+  });
+  return membership?.organizationId ?? null;
+}
+
 export interface AccountWorkspace {
   id: string;
   name: string;
@@ -9,7 +19,7 @@ export interface AccountWorkspace {
 }
 
 export interface AccountContext {
-  user: { id: string; email: string; name: string; avatar: string | null; role: string };
+  user: { id: string; email: string; name: string; avatar: string | null; role: string; hasPassword: boolean };
   workspace: AccountWorkspace | null;
 }
 
@@ -19,7 +29,7 @@ export interface AccountContext {
  */
 export async function loadAccount(userId: string): Promise<AccountContext | null> {
   const user = await db.user.findUnique({ where: { id: userId } });
-  if (!user) return null;
+  if (!user || user.accountStatus !== "active") return null;
 
   const membership = await db.organizationMember.findFirst({
     where: { userId },
@@ -36,6 +46,7 @@ export async function loadAccount(userId: string): Promise<AccountContext | null
       name: user.name ?? user.email,
       avatar: user.avatar ?? null,
       role: user.role,
+      hasPassword: Boolean(user.passwordHash),
     },
     workspace: org
       ? {

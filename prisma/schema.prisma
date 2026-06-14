@@ -136,6 +136,7 @@ model Project {
   marketplace    String   @default("amazon") // amazon, ebay, walmart, etc.
   country        String   @default("US")
   status         String   @default("active") // active, archived, draft
+  agentId        String   @default("ali") @map("agent_id")
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 

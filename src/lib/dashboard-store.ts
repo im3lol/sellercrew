@@ -62,6 +62,7 @@ interface DashboardDataState {
   creditsBalance: number;
   creditsUsed: number;
   plan: "starter" | "pro" | "agency";
+  loadProjects: () => Promise<void>;
   createProject: (name: string) => DashboardProject;
   updateProject: (id: string, patch: Partial<DashboardProject>) => void;
   deleteProject: (id: string) => void;
@@ -109,6 +110,23 @@ export const useDashboardStore = create<DashboardDataState>()(
       creditsUsed: 0,
       plan: "pro",
 
+      loadProjects: async () => {
+        try {
+          const res = await fetch("/api/projects", { credentials: "include" });
+          if (!res.ok) return;
+          const data = await res.json();
+          if (!Array.isArray(data.projects)) return;
+          set((state) => ({
+            projects: data.projects as DashboardProject[],
+            selectedProjectId: data.projects.some((p: DashboardProject) => p.id === state.selectedProjectId)
+              ? state.selectedProjectId
+              : data.projects[0]?.id ?? null,
+          }));
+        } catch {
+          // Offline / not signed in — keep the cached projects.
+        }
+      },
+
       createProject: (name) => {
         const timestamp = new Date().toISOString();
         const project: DashboardProject = {
@@ -125,19 +143,37 @@ export const useDashboardStore = create<DashboardDataState>()(
           projects: [project, ...state.projects],
           selectedProjectId: project.id,
         }));
+        void fetch("/api/projects", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            id: project.id,
+            name: project.name,
+            marketplace: project.marketplace,
+            country: project.country,
+            status: project.status,
+            agentId: project.agentId,
+          }),
+        }).catch(() => {});
         return project;
       },
 
-      updateProject: (id, patch) =>
+      updateProject: (id, patch) => {
         set((state) => ({
           projects: state.projects.map((project) =>
             project.id === id
               ? { ...project, ...patch, updatedAt: new Date().toISOString() }
               : project
           ),
-        })),
+        }));
+        void fetch("/api/projects", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id, ...patch }),
+        }).catch(() => {});
+      },
 
-      deleteProject: (id) =>
+      deleteProject: (id) => {
         set((state) => ({
           projects: state.projects.filter((project) => project.id !== id),
           listings: state.listings.filter((listing) => listing.projectId !== id),
@@ -145,7 +181,9 @@ export const useDashboardStore = create<DashboardDataState>()(
           workflowRuns: state.workflowRuns.filter((run) => run.projectId !== id),
           selectedProjectId:
             state.selectedProjectId === id ? state.projects.find((project) => project.id !== id)?.id ?? null : state.selectedProjectId,
-        })),
+        }));
+        void fetch(`/api/projects?id=${encodeURIComponent(id)}`, { method: "DELETE" }).catch(() => {});
+      },
 
       setSelectedProject: (selectedProjectId) => set({ selectedProjectId }),
 
@@ -265,6 +303,8 @@ export const useDashboardStore = create<DashboardDataState>()(
         const normalizedPlan: DashboardDataState["plan"] =
           plan === "pro" || plan === "agency" ? plan : plan === "enterprise" ? "agency" : "starter";
         set({ creditsBalance: balance, creditsUsed: used, plan: normalizedPlan });
+        // Projects are now server-backed; load the authoritative list.
+        void get().loadProjects();
       },
 
       switchWorkspace: (workspaceId) =>
