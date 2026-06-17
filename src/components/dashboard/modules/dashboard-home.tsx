@@ -47,7 +47,7 @@ export function DashboardHome() {
       <OnboardingJourney />
 
       {/* Welcome banner */}
-      <Card className="relative overflow-hidden border-0 bg-[#0B0F1A] text-white">
+      <Card data-tour="home-welcome" className="relative overflow-hidden border-0 bg-[#0B0F1A] text-white">
         <div className="absolute inset-0">
           <div className="absolute right-0 top-0 h-64 w-64 rounded-full bg-blue-500/10 blur-3xl" />
           <div className="absolute bottom-0 left-0 h-48 w-48 rounded-full bg-purple-500/10 blur-3xl" />
@@ -123,7 +123,7 @@ export function DashboardHome() {
       )}
 
       {/* Stats */}
-      <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
+      <div data-tour="home-stats" className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
         {statsCards.map((stat) => (
           <Card key={stat.title} className="transition-shadow hover:shadow-md">
             <CardContent className="p-3 sm:p-4">
@@ -149,7 +149,7 @@ export function DashboardHome() {
 
       <div className="grid lg:grid-cols-3 gap-6">
         {/* Recent Activity */}
-        <Card className="lg:col-span-2">
+        <Card data-tour="home-activity" className="lg:col-span-2">
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
               <CardTitle className="text-base">Recent Agent Activity</CardTitle>
