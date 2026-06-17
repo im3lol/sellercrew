@@ -725,7 +725,7 @@ export function DashboardV2() {
           <div className="px-2 py-2 shrink-0">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <button className="w-full flex items-center gap-2 px-2 py-2 rounded-lg hover:bg-gray-50 transition-colors text-left">
+                <button data-tour="workspace-switcher" className="w-full flex items-center gap-2 px-2 py-2 rounded-lg hover:bg-gray-50 transition-colors text-left">
                   <div className="w-8 h-8 rounded-lg bg-[#0B0F1A] flex items-center justify-center shrink-0">
                     {activeWorkspace?.logo ? (
                       <img
@@ -805,7 +805,10 @@ export function DashboardV2() {
                   <div key={group.label} className="mb-3">
                     {/* Group Label */}
                     {sidebarOpen && (
-                        <div className="animate-in fade-in duration-150">
+                        <div
+                          data-tour={group.label === 'Standalone Tools' ? 'nav-group-tools' : group.label === 'Team' ? 'nav-group-team' : undefined}
+                          className="animate-in fade-in duration-150"
+                        >
                           {group.collapsible ? (
                             <button
                               type="button"
@@ -943,7 +946,7 @@ export function DashboardV2() {
             {/* Search + Actions */}
             <div className="flex items-center gap-2 md:gap-3">
               {/* Search (decorative) */}
-              <div className="hidden md:flex items-center relative">
+              <div data-tour="header-search" className="hidden md:flex items-center relative">
                 <Search className="absolute left-2.5 h-3.5 w-3.5 text-gray-400" />
                 <Input
                   placeholder="Search..."
@@ -967,6 +970,7 @@ export function DashboardV2() {
               <Tooltip>
                 <TooltipTrigger asChild>
                   <button
+                    data-tour="header-credits"
                     onClick={() => setDashboardPage('plans')}
                     className="hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-[#035EF9]/5 hover:bg-[#035EF9]/10 transition-colors"
                   >
@@ -984,6 +988,7 @@ export function DashboardV2() {
               <Tooltip>
                 <TooltipTrigger asChild>
                   <button
+                    data-tour="header-notifications"
                     onClick={() => setDashboardPage('agent-history')}
                     className="relative p-2 rounded-lg hover:bg-gray-50 transition-colors"
                   >
@@ -997,7 +1002,7 @@ export function DashboardV2() {
               {/* User Dropdown */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <button className="flex items-center gap-2 p-1 rounded-lg hover:bg-gray-50 transition-colors">
+                  <button data-tour="header-user-menu" className="flex items-center gap-2 p-1 rounded-lg hover:bg-gray-50 transition-colors">
                     <Avatar className="h-8 w-8">
                       {user?.avatar ? (
                         <AvatarImage src={user.avatar} alt={user?.name || 'User'} />
