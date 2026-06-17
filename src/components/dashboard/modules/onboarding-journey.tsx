@@ -135,12 +135,14 @@ export function OnboardingJourney() {
           <div className="sc-blob pointer-events-none absolute -left-10 -top-10 h-40 w-40 rounded-full bg-white/15 blur-2xl" />
           <div className="sc-blob pointer-events-none absolute -bottom-12 right-0 h-44 w-44 rounded-full bg-white/10 blur-2xl" style={{ animationDelay: '1.5s' }} />
 
-          <div className="relative flex items-center gap-2">
-            <span className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-xl bg-white/95 p-1 shadow">
-              {/* small file (~13KB), fine as a plain img */}
-              <img src="/logo2.png" alt="SellerCrew" className="h-full w-full object-contain" />
-            </span>
-            <span className="text-lg font-extrabold tracking-tight">sellercrew</span>
+          <div className="relative flex items-center gap-2.5">
+            {/* colorful app-icon tile, edge-to-edge (no white frame) */}
+            <img
+              src="/logo2.png"
+              alt="SellerCrew"
+              className="h-10 w-10 rounded-xl object-cover shadow-lg ring-1 ring-white/40"
+            />
+            <span className="text-lg font-extrabold tracking-tight drop-shadow-sm">sellercrew</span>
           </div>
 
           <div key={index} className="relative my-8 flex flex-col items-center text-center animate-in fade-in zoom-in-95 slide-in-from-left-3 duration-500">
