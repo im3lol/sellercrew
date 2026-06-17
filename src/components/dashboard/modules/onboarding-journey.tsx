@@ -1,148 +1,222 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { ArrowRight, Check, FolderPlus, Sparkles, Cloud, X, Rocket } from 'lucide-react';
+import { useState } from 'react';
+import {
+  ArrowLeft,
+  ArrowRight,
+  BarChart3,
+  Bot,
+  FileText,
+  FolderKanban,
+  Rocket,
+  Sparkles,
+  X,
+} from 'lucide-react';
 import { useAppStore, type DashboardPage } from '@/lib/store';
 import { useDashboardStore } from '@/lib/dashboard-store';
 import { Button } from '@/components/ui/button';
-import { Progress } from '@/components/ui/progress';
 
-interface Step {
-  id: string;
+interface TourStep {
+  kicker: string;
   title: string;
   description: string;
+  highlights: string[];
   icon: React.ElementType;
-  done: boolean;
-  cta: string;
-  page: DashboardPage;
-  optional?: boolean;
+  /** Optional jump target for the final "Get started" action. */
+  page?: DashboardPage;
 }
+
+const STEPS: TourStep[] = [
+  {
+    kicker: 'Welcome aboard',
+    title: 'Meet SellerCrew',
+    description:
+      'Your AI crew that turns a single product into a compliant, high-converting Amazon listing — research, copy, compliance, and images, end to end.',
+    highlights: ['11 specialist AI agents', 'Evidence-locked, policy-safe output', 'A quick 60-second tour'],
+    icon: Sparkles,
+  },
+  {
+    kicker: 'Step 1 · Organize',
+    title: 'Projects keep each product tidy',
+    description:
+      'Every product lives in its own project — its source images, generated listing, and history all in one place.',
+    highlights: ['One project per product', 'Switch products in a click', 'Nothing gets mixed up'],
+    icon: FolderKanban,
+  },
+  {
+    kicker: 'Step 2 · Generate',
+    title: 'The crew writes your listing',
+    description:
+      'Run the Full Listing Workflow and the 11-agent crew — Ali, Saleem, Noor, Raed and the rest — researches, writes, checks compliance, and designs the images for you.',
+    highlights: ['Title, bullets, description & keywords', 'Compliance gate before delivery', 'Product images generated for you'],
+    icon: Bot,
+  },
+  {
+    kicker: 'Step 3 · Review',
+    title: 'Listings & assets, ready to use',
+    description:
+      'Review and edit everything the crew produced. Generated images are backed up to your own Google Drive automatically.',
+    highlights: ['Edit title, bullets & keywords', 'Compliance score per listing', 'Images saved to your Drive'],
+    icon: FileText,
+  },
+  {
+    kicker: 'Step 4 · Go deeper',
+    title: 'Standalone tools when you need them',
+    description:
+      'Beyond the full workflow, use any tool on its own — keyword research, competitor analysis, listing review, and policy checks.',
+    highlights: ['Keyword & SEO research', 'Market & competitor analysis', 'Listing review & policy check'],
+    icon: BarChart3,
+  },
+  {
+    kicker: "You're all set",
+    title: 'Create your first project',
+    description:
+      'That’s the whole tour. Start a project, run the workflow, and your first listing is minutes away.',
+    highlights: ['Start with one product', 'Run the Full Listing Workflow', 'Refine and publish'],
+    icon: Rocket,
+    page: 'projects',
+  },
+];
 
 export function OnboardingJourney() {
   const setDashboardPage = useAppStore((s) => s.setDashboardPage);
-  const activeWorkspace = useAppStore((s) => s.activeWorkspace);
   const user = useAppStore((s) => s.user);
-  const projects = useDashboardStore((s) => s.projects);
-  const listings = useDashboardStore((s) => s.listings);
   const dismissed = useDashboardStore((s) => s.onboardingDismissed);
   const dismissOnboarding = useDashboardStore((s) => s.dismissOnboarding);
+  const [index, setIndex] = useState(0);
 
-  const [driveConnected, setDriveConnected] = useState(false);
+  if (dismissed) return null;
 
-  useEffect(() => {
-    if (!activeWorkspace?.id) return;
-    let active = true;
-    fetch(`/api/google-drive?workspaceId=${encodeURIComponent(activeWorkspace.id)}`, { credentials: 'include' })
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data) => {
-        if (active && data) setDriveConnected(Boolean(data.connected));
-      })
-      .catch(() => {});
-    return () => {
-      active = false;
-    };
-  }, [activeWorkspace?.id]);
+  const step = STEPS[index];
+  const StepIcon = step.icon;
+  const isFirst = index === 0;
+  const isLast = index === STEPS.length - 1;
+  const firstName = user?.name ? user.name.split(' ')[0] : null;
 
-  const steps: Step[] = [
-    {
-      id: 'project',
-      title: 'Create your first product project',
-      description: 'A project holds one product, its assets, and its generated listing.',
-      icon: FolderPlus,
-      done: projects.length > 0,
-      cta: 'New project',
-      page: 'projects',
-    },
-    {
-      id: 'workflow',
-      title: 'Run the Full Listing Workflow',
-      description: 'Let the 11-agent crew produce a compliant, evidence-locked Amazon listing.',
-      icon: Sparkles,
-      done: listings.length > 0,
-      cta: 'Generate a listing',
-      page: 'listing-builder',
-    },
-    {
-      id: 'drive',
-      title: 'Connect Google Drive',
-      description: 'Back up your product images and listings to your own Drive (optional).',
-      icon: Cloud,
-      done: driveConnected,
-      cta: 'Connect Drive',
-      page: 'account-settings',
-      optional: true,
-    },
-  ];
-
-  const required = steps.filter((s) => !s.optional);
-  const completed = steps.filter((s) => s.done).length;
-  const allRequiredDone = required.every((s) => s.done);
-
-  if (dismissed || allRequiredDone) return null;
+  const finish = (page?: DashboardPage) => {
+    dismissOnboarding();
+    if (page) setDashboardPage(page);
+  };
 
   return (
-    <div className="relative overflow-hidden rounded-2xl border border-[#7E44E6]/15 bg-gradient-to-br from-[#035EF9]/5 via-white to-[#7E44E6]/8 p-5">
-      <button
-        type="button"
-        aria-label="Dismiss onboarding"
-        onClick={dismissOnboarding}
-        className="absolute right-3 top-3 rounded-lg p-1.5 text-slate-400 hover:bg-white hover:text-slate-600"
-      >
-        <X className="h-4 w-4" />
-      </button>
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label="SellerCrew product tour"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm animate-in fade-in duration-200"
+    >
+      {/* Local keyframes for the left-panel effects (kept off the global bundle). */}
+      <style>{`
+        @keyframes sc-float { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-10px)} }
+        @keyframes sc-blob {
+          0%,100%{ transform: translate(0,0) scale(1); }
+          33%{ transform: translate(12px,-14px) scale(1.12); }
+          66%{ transform: translate(-10px,10px) scale(0.94); }
+        }
+        @keyframes sc-shine { 0%{ background-position: 0% 50% } 100%{ background-position: 200% 50% } }
+        .sc-float{ animation: sc-float 3.2s ease-in-out infinite; }
+        .sc-blob{ animation: sc-blob 9s ease-in-out infinite; }
+        .sc-shine{ background-size: 200% 200%; animation: sc-shine 6s linear infinite; }
+      `}</style>
 
-      <div className="flex items-center gap-2">
-        <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-[#035EF9] to-[#7E44E6] text-white">
-          <Rocket className="h-5 w-5" />
-        </div>
-        <div>
-          <h2 className="text-lg font-bold tracking-tight text-slate-900">
-            Welcome{user?.name ? `, ${user.name.split(' ')[0]}` : ''} 👋
-          </h2>
-          <p className="text-xs text-slate-500">Get your first Amazon listing live in three steps.</p>
-        </div>
-      </div>
+      <div className="relative flex w-full max-w-3xl flex-col overflow-hidden rounded-3xl bg-white shadow-2xl animate-in zoom-in-95 fade-in duration-300 md:flex-row md:max-h-[88vh]">
+        <button
+          type="button"
+          aria-label="Skip tour"
+          onClick={() => finish()}
+          className="absolute right-4 top-4 z-20 rounded-lg p-1.5 text-white/80 transition hover:bg-white/15 hover:text-white md:text-slate-300 md:hover:bg-slate-100 md:hover:text-slate-600"
+        >
+          <X className="h-4 w-4" />
+        </button>
 
-      <div className="mt-4 flex items-center gap-3">
-        <Progress value={(completed / steps.length) * 100} className="h-2 flex-1" />
-        <span className="text-xs font-medium text-slate-500">{completed}/{steps.length}</span>
-      </div>
+        {/* ── Left animated panel ─────────────────────────────── */}
+        <div className="sc-shine relative flex shrink-0 flex-col justify-between overflow-hidden bg-gradient-to-br from-[#035EF9] via-[#7E44E6] to-[#FC7403] p-8 text-white md:w-2/5">
+          {/* floating blobs */}
+          <div className="sc-blob pointer-events-none absolute -left-10 -top-10 h-40 w-40 rounded-full bg-white/15 blur-2xl" />
+          <div className="sc-blob pointer-events-none absolute -bottom-12 right-0 h-44 w-44 rounded-full bg-white/10 blur-2xl" style={{ animationDelay: '1.5s' }} />
 
-      <div className="mt-4 space-y-2">
-        {steps.map((step) => (
-          <div
-            key={step.id}
-            className={`flex items-center gap-3 rounded-xl border bg-white/70 p-3 ${
-              step.done ? 'border-emerald-200' : 'border-slate-200'
-            }`}
-          >
-            <div
-              className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${
-                step.done ? 'bg-emerald-100 text-emerald-600' : 'bg-slate-100 text-slate-500'
-              }`}
-            >
-              {step.done ? <Check className="h-5 w-5" /> : <step.icon className="h-5 w-5" />}
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="flex items-center gap-2 text-sm font-medium text-slate-800">
-                {step.title}
-                {step.optional && <span className="text-[10px] font-normal text-slate-400">optional</span>}
-              </p>
-              <p className="truncate text-xs text-slate-500">{step.description}</p>
-            </div>
-            {!step.done && (
-              <Button
-                size="sm"
-                variant="outline"
-                className="h-8 shrink-0 gap-1 text-xs"
-                onClick={() => setDashboardPage(step.page)}
-              >
-                {step.cta}
-                <ArrowRight className="h-3.5 w-3.5" />
-              </Button>
-            )}
+          <div className="relative flex items-center gap-2">
+            <span className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-xl bg-white/95 p-1 shadow">
+              {/* small file (~13KB), fine as a plain img */}
+              <img src="/logo2.png" alt="SellerCrew" className="h-full w-full object-contain" />
+            </span>
+            <span className="text-lg font-extrabold tracking-tight">sellercrew</span>
           </div>
-        ))}
+
+          <div key={index} className="relative my-8 flex flex-col items-center text-center animate-in fade-in zoom-in-95 slide-in-from-left-3 duration-500">
+            <span className="sc-float flex h-24 w-24 items-center justify-center rounded-3xl bg-white/15 ring-1 ring-white/30 backdrop-blur">
+              <StepIcon className="h-11 w-11" />
+            </span>
+            <p className="mt-5 text-sm font-medium uppercase tracking-wider text-white/80">{step.kicker}</p>
+          </div>
+
+          <div className="relative flex items-center gap-1.5">
+            {STEPS.map((_, d) => (
+              <span
+                key={d}
+                className={`h-1.5 rounded-full transition-all duration-300 ${d === index ? 'w-6 bg-white' : 'w-1.5 bg-white/40'}`}
+              />
+            ))}
+          </div>
+        </div>
+
+        {/* ── Right content panel ─────────────────────────────── */}
+        <div className="flex flex-1 flex-col overflow-y-auto p-8">
+          <div key={index} className="animate-in fade-in slide-in-from-bottom-2 duration-300">
+            {isFirst && firstName && (
+              <p className="mb-1 text-sm font-medium text-[#7E44E6]">Hi {firstName} 👋</p>
+            )}
+            <h2 className="text-2xl font-bold tracking-tight text-slate-900">{step.title}</h2>
+            <p className="mt-2 text-sm leading-relaxed text-slate-500">{step.description}</p>
+
+            <ul className="mt-5 space-y-2.5">
+              {step.highlights.map((h) => (
+                <li key={h} className="flex items-center gap-2.5 text-sm text-slate-700">
+                  <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[#035EF9]/10 text-[#035EF9]">
+                    <ArrowRight className="h-3 w-3" />
+                  </span>
+                  {h}
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          <div className="mt-auto flex items-center justify-between gap-3 pt-8">
+            <span className="text-xs font-medium text-slate-400">
+              {index + 1} / {STEPS.length}
+            </span>
+            <div className="flex items-center gap-2">
+              {!isFirst && (
+                <Button variant="ghost" size="sm" className="gap-1 text-slate-500" onClick={() => setIndex((i) => i - 1)}>
+                  <ArrowLeft className="h-4 w-4" /> Back
+                </Button>
+              )}
+              {isLast ? (
+                <Button
+                  size="sm"
+                  className="gap-1.5 bg-gradient-to-r from-[#035EF9] to-[#7E44E6] hover:opacity-90"
+                  onClick={() => finish(step.page)}
+                >
+                  Get started <Rocket className="h-4 w-4" />
+                </Button>
+              ) : (
+                <Button size="sm" className="gap-1.5" onClick={() => setIndex((i) => i + 1)}>
+                  Next <ArrowRight className="h-4 w-4" />
+                </Button>
+              )}
+            </div>
+          </div>
+
+          {!isLast && (
+            <button
+              type="button"
+              onClick={() => finish()}
+              className="mt-3 self-end text-xs text-slate-400 transition hover:text-slate-600"
+            >
+              Skip the tour
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );
