@@ -18,11 +18,11 @@ const STALE_JOB_MS = 15 * 60 * 1000; // a real run is <~6min; older "running" = 
  */
 async function reapStrandedJobs() {
   const cutoff = new Date(Date.now() - STALE_JOB_MS);
-  let stranded: Array<{ id: string; charged: boolean; refunded: boolean; creditId: string | null }> = [];
+  let stranded: Array<{ id: string; charged: boolean; refunded: boolean; creditId: string | null; result: string | null }> = [];
   try {
     stranded = await db.workflowJob.findMany({
       where: { status: { in: ["queued", "running"] }, updatedAt: { lt: cutoff } },
-      select: { id: true, charged: true, refunded: true, creditId: true },
+      select: { id: true, charged: true, refunded: true, creditId: true, result: true },
     });
   } catch (error) {
     console.error("[worker] reaper query failed:", error);
@@ -30,6 +30,14 @@ async function reapStrandedJobs() {
   }
 
   for (const job of stranded) {
+    // If a result was already persisted, the workflow actually delivered before the
+    // process died — do NOT refund (the user kept the listing); just unstick the
+    // status. Only genuinely incomplete jobs (no result) are failed + refunded.
+    const delivered = Boolean(job.result);
+    if (delivered) {
+      await db.workflowJob.update({ where: { id: job.id }, data: { status: "completed" } }).catch(() => {});
+      continue;
+    }
     if (job.charged && !job.refunded && job.creditId) {
       await refundByCreditId(job.creditId, FULL_WORKFLOW_COST);
     }

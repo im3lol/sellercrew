@@ -59,7 +59,13 @@ services:
       context: .
       target: worker
     image: sellercrew-worker:latest
-    command: ["bunx", "prisma", "db", "push", "--skip-generate"]
+    # Apply committed migrations. Self-heals an existing db-push-initialized volume
+    # (no migration history): if `migrate deploy` fails because the schema is already
+    # present (P3005), baseline 0_init then deploy. Fresh volumes just apply 0_init.
+    command:
+      - "sh"
+      - "-c"
+      - "bunx prisma migrate deploy || (bunx prisma migrate resolve --applied 0_init && bunx prisma migrate deploy)"
     environment: *app-environment
     depends_on:
       postgres:
