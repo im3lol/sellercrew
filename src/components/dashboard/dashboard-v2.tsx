@@ -839,6 +839,7 @@ export function DashboardV2() {
                       const navBtn = (
                         <button
                           key={item.page}
+                          data-tour={`nav-${item.page}`}
                           onClick={() => {
                             if (item.page === 'listing-builder' || item.page === 'assets') setSelectedProject(null);
                             setDashboardPage(item.page);
