@@ -375,21 +375,26 @@ export function FullWorkflow() {
         const { jobId } = (await jobRes.json()) as { jobId: string };
         let processed = 0;
         let polls = 0;
-        const maxPolls = 180; // ~6 minutes
+        const maxPolls = 450; // ~15 minutes (image generation can take a while)
         while (true) {
           if (polls++ >= maxPolls) {
-            throw new Error("The workflow is taking too long. Make sure the background worker (bun run worker) is running.");
+            throw new Error("The workflow is still running in the background. Image generation can take several minutes — please keep this page open and try again shortly.");
           }
           await new Promise((resolve) => setTimeout(resolve, 2000));
           const poll = await fetch(`/api/full-workflow/jobs?id=${encodeURIComponent(jobId)}`, { credentials: "include" });
           if (!poll.ok) throw new Error("Lost track of the workflow job.");
-          const job = (await poll.json()) as { status: string; events?: unknown[]; error?: string };
+          const job = (await poll.json()) as { status: string; events?: unknown[]; result?: unknown; error?: string };
           const events = Array.isArray(job.events) ? job.events : [];
           for (; processed < events.length; processed += 1) {
             const captured = applyEvent(events[processed] as WorkflowEvent);
             if (captured) data = captured;
           }
-          if (job.status === "completed" || job.status === "blocked") break;
+          if (job.status === "completed" || job.status === "blocked") {
+            // The polled events have image data stripped to stay small; the full
+            // result (with images) lives in the job's result column.
+            if (job.result) data = { provider: data?.provider ?? "queue", model: data?.model, result: job.result };
+            break;
+          }
           if (job.status === "failed") throw new Error(job.error || "The full workflow failed.");
         }
       } else {
@@ -422,6 +427,8 @@ export function FullWorkflow() {
 
       completeWorkflowRun(runId, parsed);
       setResult(parsed);
+      // Live events carry no image bytes (kept small for polling); use the final ones.
+      if (parsed.generatedImages?.length) setGeneratedImages(parsed.generatedImages);
       setResultProvider(data.provider ?? null);
       setActiveStep(workflowSteps.length - 1);
       setActiveTab("delivery");
