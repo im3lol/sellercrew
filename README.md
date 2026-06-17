@@ -26,12 +26,12 @@ produces compliant, evidence-locked listings.
 
 ## Local Development
 
-Copy `.env.example` to `.env.local`, configure PostgreSQL and the integrations
-you need, then run:
+Copy `.env.example` to `.env` (the single env file read by Next.js, Prisma, and
+docker compose alike), configure PostgreSQL and the integrations you need, then run:
 
 ```bash
 bun install
-bun run db:push
+bun run db:push   # local scratch DB; Docker/production use `bun run db:deploy` (migrations)
 bun run dev
 ```
 
