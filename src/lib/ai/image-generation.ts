@@ -3,6 +3,10 @@ import { DEFAULT_OPENROUTER_IMAGE_MODELS, getSettings } from "@/lib/settings";
 import { getSecret } from "@/lib/secrets";
 import type { GeneratedImage } from "@/lib/workflow";
 
+// Image generation legitimately takes longer than text; keep its own bound so a
+// slow render doesn't hang the whole workflow. Override with AI_IMAGE_TIMEOUT_MS.
+const AI_IMAGE_TIMEOUT_MS = Number(process.env.AI_IMAGE_TIMEOUT_MS) || 90_000;
+
 function dataUrlToPart(image: AIImageInput) {
   const commaIndex = image.dataUrl.indexOf(",");
   if (commaIndex === -1) throw new Error("Invalid image data URL.");
@@ -60,7 +64,7 @@ Use the supplied product photos as strict visual references. Preserve the exact 
             }],
             modalities: openRouterModel.includes("seedream") ? ["image"] : ["image", "text"],
           }),
-          signal: AbortSignal.timeout(110_000),
+          signal: AbortSignal.timeout(AI_IMAGE_TIMEOUT_MS),
         });
         const payload = await response.json() as {
           choices?: Array<{
@@ -136,7 +140,7 @@ Use the supplied product photos as strict visual references. Preserve the exact 
           },
         },
       }),
-      signal: AbortSignal.timeout(110_000),
+      signal: AbortSignal.timeout(AI_IMAGE_TIMEOUT_MS),
     }
   );
 

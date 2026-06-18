@@ -37,6 +37,20 @@ export interface AITextResult {
   usage?: AITokenUsage;
 }
 
+// Per-call timeout. Free models are slow, but 110s × a 5-deep fallback chain meant
+// a single stuck agent could hang ~9 minutes. Bounding each call to ~45s keeps the
+// whole chain (3 OpenRouter models + Anthropic + Gemini) under the 300s maxDuration
+// while still giving slow free models room. Override with AI_TEXT_TIMEOUT_MS.
+const AI_TEXT_TIMEOUT_MS = Number(process.env.AI_TEXT_TIMEOUT_MS) || 45_000;
+
+// A non-vision model can't use base64 images and just pays the token/latency cost
+// of receiving them. We only attach images for models that can actually read them.
+function isVisionModel(model: string): boolean {
+  return /gemma|gemini|vision|llava|pixtral|[- ]vl\b|qwen.*vl|llama.*vision|gpt-4|gpt-5|claude|sonnet|opus|haiku|grok/i.test(
+    model
+  );
+}
+
 function dataUrlToBase64(dataUrl: string) {
   const commaIndex = dataUrl.indexOf(",");
   if (commaIndex === -1) throw new Error("Invalid image data URL.");
@@ -113,7 +127,7 @@ async function generateWithAnthropic(options: GenerateAITextOptions, modelOverri
       max_tokens: options.maxTokens ?? 2_000,
       stream: Boolean(options.onTextDelta),
     }),
-    signal: AbortSignal.timeout(110_000),
+    signal: AbortSignal.timeout(AI_TEXT_TIMEOUT_MS),
   });
 
   if (options.onTextDelta) {
@@ -209,7 +223,7 @@ async function generateWithGemini(options: GenerateAITextOptions, modelOverride?
           ...(options.json ? { responseMimeType: "application/json" } : {}),
         },
       }),
-      signal: AbortSignal.timeout(110_000),
+      signal: AbortSignal.timeout(AI_TEXT_TIMEOUT_MS),
     }
   );
 
@@ -305,10 +319,12 @@ async function generateWithOpenRouter(options: GenerateAITextOptions, modelOverr
         messages,
         temperature: 0.2,
         max_tokens: maxTokens,
+        // Route to the fastest upstream for this model — free pools vary widely.
+        provider: { sort: "throughput" },
         ...(options.json ? { response_format: { type: "json_object" } } : {}),
         reasoning: { effort: "none" },
       }),
-      signal: AbortSignal.timeout(110_000),
+      signal: AbortSignal.timeout(AI_TEXT_TIMEOUT_MS),
     });
     return {
       response,
@@ -316,8 +332,19 @@ async function generateWithOpenRouter(options: GenerateAITextOptions, modelOverr
     };
   };
 
-  let maxTokens = Math.min(options.maxTokens ?? 2_000, 2_000);
+  // Honor the caller's budget (capped so a single free-tier call can't be rejected
+  // outright); the affordability fallback below trims further if the account can't
+  // cover it. The old hard 2,000 cap silently truncated copy-heavy agents.
+  let maxTokens = Math.min(options.maxTokens ?? 2_000, 4_000);
   let { response, payload } = await request(maxTokens);
+
+  // Free models rate-limit constantly; a short backoff + one retry usually clears
+  // it faster than falling through to a slower paid provider.
+  if (response.status === 429 || response.status === 503) {
+    await new Promise((resolve) => setTimeout(resolve, 1_500));
+    ({ response, payload } = await request(maxTokens));
+  }
+
   if (!response.ok) {
     const message = payload.error?.message || "";
     const affordable = message.match(/can only afford\s+(\d+)/i);
@@ -356,7 +383,13 @@ async function generateWithOpenRouterTextModels(
 
   for (const model of chain) {
     try {
-      return await generateWithOpenRouter(options, model);
+      // Don't ship base64 images to a model that can't read them — it only adds
+      // tokens and latency (and some text-only models reject the request).
+      const perModel =
+        options.images?.length && !isVisionModel(model)
+          ? { ...options, images: undefined }
+          : options;
+      return await generateWithOpenRouter(perModel, model);
     } catch (error) {
       errors.push(`${model}: ${error instanceof Error ? error.message : "request failed"}`);
     }

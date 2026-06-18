@@ -102,6 +102,29 @@ async function withProviderRetry<T>(
   throw lastError;
 }
 
+// Output budget sized to each agent's job instead of a flat 2,500. Short
+// decisions (gates) get less; copy-heavy agents get more so they don't truncate.
+// ali-final uses the dedicated 8,000 final budget below.
+const AGENT_MAX_TOKENS: Record<string, number> = {
+  "ali-intake": 2_500,
+  "saleem-gate": 1_200,
+  noor: 2_500,
+  raed: 3_000,
+  fares: 2_000,
+  hakim: 2_500,
+  bayan: 3_500,
+  nadeem: 3_000,
+  rayan: 3_000,
+  adam: 3_000,
+  badr: 2_000,
+  "saleem-final": 1_500,
+};
+
+function agentMaxTokens(stepId: string, final?: boolean) {
+  if (final) return 8_000;
+  return AGENT_MAX_TOKENS[stepId] ?? 2_500;
+}
+
 function agentInstructions(stepId: string) {
   const instructions: Record<string, string> = {
     "ali-intake": `You are Ali, SellerCrew's workflow commander.
@@ -249,13 +272,14 @@ NON-NEGOTIABLE EXECUTION RULES:
 
 Return only JSON matching this schema:
 ${JSON.stringify(z.toJSONSchema(schema))}`;
+  const maxTokens = agentMaxTokens(step.id, options.final);
   let response = await withProviderRetry(
     () => generateAIText({
       system: systemPrompt,
       prompt: requestPrompt,
       images: options.images,
       json: true,
-      maxTokens: options.final ? 8_000 : 2_500,
+      maxTokens,
     }),
     (delayMs) => options.emit({
       type: "step",
@@ -282,7 +306,7 @@ ${JSON.stringify(z.toJSONSchema(schema))}`;
         prompt: requestPrompt,
         images: options.images,
         json: true,
-        maxTokens: options.final ? 8_000 : 2_500,
+        maxTokens,
       }),
       (delayMs) => options.emit({
         type: "step",
@@ -672,31 +696,61 @@ export async function runWorkflow(input: ProductInput, { userId: uid, emit, onCh
 
         if (settings?.features.imageGeneration !== false && adam && "output" in adam) {
           const prompts = imagePrompts(adam);
-          for (const [index, item] of prompts.entries()) {
-            emit({
-              type: "step",
-              stepId: "adam",
-              status: "working",
-              message: `Generating image ${index + 1} of ${prompts.length}: ${item.purpose}`,
-            });
-            try {
-              const image = await generateProductImage({ ...item, referenceImages: references });
-              generatedImages.push(image);
-              emit({ type: "generated_image", image });
-            } catch (error) {
-              const adamIndex = reports.findIndex((report) => report.stepId === "adam");
-              if (adamIndex >= 0) {
-                reports[adamIndex] = {
-                  ...reports[adamIndex],
-                  warnings: [
-                    ...reports[adamIndex].warnings,
-                    `Image ${item.imageNumber} could not be generated: ${
-                      error instanceof Error ? error.message : "image provider failed"
-                    }`,
-                  ],
-                };
-                emit({ type: "report", report: reports[adamIndex] });
+          // Generate images concurrently (bounded) instead of one-at-a-time — this
+          // was the single biggest serial stretch on the critical path. A small pool
+          // keeps us from hammering the image provider all at once.
+          const IMAGE_CONCURRENCY = 3;
+          const imageWarnings: string[] = [];
+          let nextIndex = 0;
+
+          emit({
+            type: "step",
+            stepId: "adam",
+            status: "working",
+            message: prompts.length
+              ? `Generating ${prompts.length} listing images…`
+              : "Preparing listing images…",
+          });
+
+          const worker = async () => {
+            // Post-increment claims an index atomically (JS is single-threaded
+            // between awaits), so no two workers take the same prompt.
+            for (let index = nextIndex++; index < prompts.length; index = nextIndex++) {
+              const item = prompts[index];
+              try {
+                const image = await generateProductImage({ ...item, referenceImages: references });
+                generatedImages.push(image);
+                emit({ type: "generated_image", image });
+                emit({
+                  type: "step",
+                  stepId: "adam",
+                  status: "working",
+                  message: `Generated ${generatedImages.length} of ${prompts.length} images.`,
+                });
+              } catch (error) {
+                imageWarnings.push(
+                  `Image ${item.imageNumber} could not be generated: ${
+                    error instanceof Error ? error.message : "image provider failed"
+                  }`
+                );
               }
+            }
+          };
+
+          await Promise.all(
+            Array.from({ length: Math.min(IMAGE_CONCURRENCY, prompts.length) }, () => worker())
+          );
+          // Keep a stable order regardless of completion timing.
+          generatedImages.sort((a, b) => a.imageNumber - b.imageNumber);
+
+          if (imageWarnings.length) {
+            const adamIndex = reports.findIndex((report) => report.stepId === "adam");
+            if (adamIndex >= 0) {
+              reports[adamIndex] = {
+                ...reports[adamIndex],
+                warnings: [...reports[adamIndex].warnings, ...imageWarnings],
+              };
+              emit({ type: "report", report: reports[adamIndex] });
             }
           }
           emit({ type: "step", stepId: "adam", status: "completed" });
