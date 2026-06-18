@@ -217,6 +217,9 @@ export function FullWorkflow() {
   const [stepStatuses, setStepStatuses] = useState<Record<string, "queued" | "working" | "completed" | "blocked">>({});
   const [generatedImages, setGeneratedImages] = useState<GeneratedImage[]>(result?.generatedImages ?? []);
   const [activeMessage, setActiveMessage] = useState<string | null>(null);
+  // Persistent in-UI copy of the last failure, so the message stays readable even
+  // if the toast auto-hides or is missed. Cleared when a new run starts.
+  const [runError, setRunError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!project) {
@@ -313,6 +316,7 @@ export function FullWorkflow() {
     const activeProject = project ?? createProject(payload.productName);
     const runId = startWorkflowRun(activeProject.id);
     setIsRunning(true);
+    setRunError(null);
     setActiveStep(0);
     setResult(null);
     setAgentReports([]);
@@ -552,6 +556,7 @@ export function FullWorkflow() {
     } catch (error) {
       const message = error instanceof Error ? error.message : "The full workflow failed.";
       failWorkflowRun(runId, message);
+      setRunError(message);
       setActiveTab("input");
       // Keep the failure visible until the user dismisses it — a 4s auto-hide
       // flashed by before they could read what actually went wrong.
@@ -593,6 +598,24 @@ export function FullWorkflow() {
           </div>
         </div>
       </div>
+
+      {runError ? (
+        <div className="flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">
+          <AlertTriangle className="mt-0.5 size-5 shrink-0 text-red-600" />
+          <div className="min-w-0 flex-1">
+            <p className="font-semibold">The workflow could not finish</p>
+            <p className="mt-1 whitespace-pre-wrap break-words leading-6 text-red-700">{runError}</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setRunError(null)}
+            className="shrink-0 rounded-md p-1 text-red-400 transition hover:bg-red-100 hover:text-red-600"
+            aria-label="Dismiss error"
+          >
+            <X className="size-4" />
+          </button>
+        </div>
+      ) : null}
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="h-auto flex-wrap justify-start">
