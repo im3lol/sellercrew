@@ -1,14 +1,13 @@
 import { db } from "@/lib/db";
 
-// Free OpenRouter models (no per-token cost). The primary accepts image input so
-// Noor's product-image analysis still works. Admins can override these in
-// Settings & API. Free models are rate-limited by OpenRouter (see notes) and vary
-// in quality/JSON adherence — use a paid model for production-grade output.
+// Free OpenRouter models (no per-token cost). gpt-oss-120b leads for strong
+// reasoning/JSON; gemma-4-31b is multimodal so image-analysis steps (Noor) fall
+// back to it cleanly. Admins can override in Settings & API. Free models are
+// rate-limited by OpenRouter and vary in quality — use a paid model for production.
 export const DEFAULT_OPENROUTER_TEXT_MODELS = [
-  "nex-agi/nex-n2-pro:free",
+  "openai/gpt-oss-120b:free",
+  "google/gemma-4-31b-it:free",
   "nvidia/nemotron-3-ultra-550b-a55b:free",
-  "poolside/laguna-m.1:free",
-  "openrouter/owl-alpha",
 ] as const;
 
 export const DEFAULT_OPENROUTER_IMAGE_MODELS = [
