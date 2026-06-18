@@ -147,6 +147,24 @@ const workflowActivityCopy: Record<(typeof workflowSteps)[number]["id"], { title
   },
 };
 
+// Human-friendly elapsed time: "820ms", "4.1s", or "1m 23s".
+function formatDuration(ms: number): string {
+  if (!Number.isFinite(ms) || ms < 0) return "—";
+  if (ms < 1000) return `${Math.round(ms)}ms`;
+  const totalSeconds = ms / 1000;
+  if (totalSeconds < 60) return `${totalSeconds.toFixed(1)}s`;
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = Math.round(totalSeconds % 60);
+  return `${minutes}m ${seconds}s`;
+}
+
+// Duration of a single agent from its own start/finish timestamps.
+function reportDurationMs(report: { startedAt?: string; completedAt?: string }): number | null {
+  if (!report.startedAt || !report.completedAt) return null;
+  const ms = new Date(report.completedAt).getTime() - new Date(report.startedAt).getTime();
+  return Number.isFinite(ms) && ms >= 0 ? ms : null;
+}
+
 function downloadFile(name: string, content: string, type: string) {
   const url = URL.createObjectURL(new Blob([content], { type }));
   const anchor = document.createElement("a");
@@ -220,6 +238,32 @@ export function FullWorkflow() {
   // Persistent in-UI copy of the last failure, so the message stays readable even
   // if the toast auto-hides or is missed. Cleared when a new run starts.
   const [runError, setRunError] = useState<string | null>(null);
+  // Run timing: wall-clock elapsed (ticks live while running, then freezes).
+  const [runStartedAt, setRunStartedAt] = useState<number | null>(null);
+  const [runEndedAt, setRunEndedAt] = useState<number | null>(null);
+  const [nowTick, setNowTick] = useState<number>(0);
+
+  // Tick once a second while running so the elapsed clock updates live.
+  useEffect(() => {
+    if (!isRunning) return;
+    setNowTick(Date.now());
+    const id = window.setInterval(() => setNowTick(Date.now()), 1000);
+    return () => window.clearInterval(id);
+  }, [isRunning]);
+
+  const elapsedMs =
+    runStartedAt != null ? (runEndedAt ?? nowTick) - runStartedAt : null;
+
+  // Total wall-clock for the run. Falls back to the agent report timestamps so it
+  // still shows when viewing a past result (after a reload, runStartedAt is null).
+  const totalRunMs = (() => {
+    if (elapsedMs != null) return elapsedMs;
+    const times = (result?.agentReports ?? [])
+      .flatMap((report) => [report.startedAt, report.completedAt])
+      .map((value) => (value ? new Date(value).getTime() : NaN))
+      .filter((value) => Number.isFinite(value));
+    return times.length ? Math.max(...times) - Math.min(...times) : null;
+  })();
 
   useEffect(() => {
     if (!project) {
@@ -317,6 +361,8 @@ export function FullWorkflow() {
     const runId = startWorkflowRun(activeProject.id);
     setIsRunning(true);
     setRunError(null);
+    setRunStartedAt(Date.now());
+    setRunEndedAt(null);
     setActiveStep(0);
     setResult(null);
     setAgentReports([]);
@@ -565,6 +611,7 @@ export function FullWorkflow() {
         duration: Infinity,
       });
     } finally {
+      setRunEndedAt(Date.now());
       setIsRunning(false);
     }
   };
@@ -885,7 +932,17 @@ export function FullWorkflow() {
                       <span className="font-medium text-gray-600">
                         {result ? "Workflow completed" : `Step ${activeStep + 1} of ${workflowSteps.length}`}
                       </span>
-                      <span className="font-bold text-[#0B0F1A]">{progress}%</span>
+                      <div className="flex items-center gap-3">
+                        {elapsedMs != null ? (
+                          <span
+                            className="flex items-center gap-1 font-semibold text-gray-500 tabular-nums"
+                            title="Total elapsed time"
+                          >
+                            <Clock3 className="size-3.5" /> {formatDuration(elapsedMs)}
+                          </span>
+                        ) : null}
+                        <span className="font-bold text-[#0B0F1A]">{progress}%</span>
+                      </div>
                     </div>
                     <Progress value={progress} className="h-2.5 bg-gray-100" />
                   </div>
@@ -916,8 +973,26 @@ export function FullWorkflow() {
 
             <Card>
               <CardHeader className="pb-3">
-                <CardTitle className="text-base">Crew activity</CardTitle>
-                <p className="text-xs leading-5 text-gray-500">Live assignment status across the full workflow.</p>
+                <div className="flex items-center justify-between gap-2">
+                  <CardTitle className="text-base">Crew activity</CardTitle>
+                  {elapsedMs != null ? (
+                    <span
+                      className={`flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold tabular-nums ${
+                        isRunning ? "bg-[#035EF9]/10 text-[#035EF9]" : "bg-green-50 text-green-700"
+                      }`}
+                      title="Total elapsed time"
+                    >
+                      <Clock3 className="size-3.5" /> {formatDuration(elapsedMs)}
+                    </span>
+                  ) : null}
+                </div>
+                <p className="text-xs leading-5 text-gray-500">
+                  {isRunning && activeMessage
+                    ? activeMessage
+                    : result
+                      ? "All specialists finished. Times for each agent are shown below."
+                      : "Live assignment status across the full workflow."}
+                </p>
               </CardHeader>
               <CardContent>
                 <div>
@@ -930,6 +1005,7 @@ export function FullWorkflow() {
                     const blocked = outputStep?.status === "blocked";
                     const skipped = outputStep?.status === "skipped";
                     const report = agentReports.find((item) => item.stepId === step.id);
+                    const dur = report ? reportDurationMs(report) : null;
 
                     return (
                       <div key={step.id} className="relative flex gap-3 pb-5 last:pb-0">
@@ -961,6 +1037,9 @@ export function FullWorkflow() {
                               <span className="text-[11px] font-semibold text-gray-400">Skipped</span>
                             ) : completed ? (
                               <span className="flex items-center gap-1.5">
+                                {dur != null ? (
+                                  <span className="text-[11px] font-semibold tabular-nums text-gray-400">{formatDuration(dur)}</span>
+                                ) : null}
                                 {report ? <Eye className="size-3.5 text-gray-400" /> : null}
                                 <CheckCircle2 className="size-4 text-green-500" />
                               </span>
@@ -988,6 +1067,46 @@ export function FullWorkflow() {
                   <Card key={key}><CardContent className="p-4"><p className="text-2xl font-bold">{value}</p><p className="mt-1 text-xs capitalize text-gray-500">{key.replace(/Score$/, "")}</p></CardContent></Card>
                 ))}
               </div>
+
+              {result.agentReports.length ? (
+                <Card>
+                  <CardHeader className="pb-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <CardTitle className="text-base">Run performance</CardTitle>
+                      {totalRunMs != null ? (
+                        <span className="flex items-center gap-1.5 rounded-full bg-green-50 px-3 py-1 text-sm font-semibold tabular-nums text-green-700">
+                          <Clock3 className="size-4" /> {formatDuration(totalRunMs)} total
+                        </span>
+                      ) : null}
+                    </div>
+                    <p className="text-xs leading-5 text-gray-500">
+                      How long each specialist took. Some agents run in parallel, so the total is shorter than the sum of all agents.
+                    </p>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid gap-x-8 sm:grid-cols-2">
+                      {workflowSteps.map((step) => {
+                        const report = result.agentReports.find((item) => item.stepId === step.id);
+                        if (!report) return null;
+                        const d = reportDurationMs(report);
+                        const agent = agents.find((item) => item.id === step.agentId) ?? agents[0];
+                        return (
+                          <div key={step.id} className="flex items-center justify-between gap-3 border-b border-gray-100 py-2 last:border-0 sm:[&:nth-last-child(2)]:border-0">
+                            <div className="flex min-w-0 items-center gap-2">
+                              <img src={agent.avatar} alt={agent.name} className="size-6 shrink-0 rounded-md object-cover" />
+                              <span className="truncate text-sm font-medium text-gray-700">{agent.name}</span>
+                              <span className="truncate text-xs text-gray-400">{step.task}</span>
+                            </div>
+                            <span className="shrink-0 text-sm font-semibold tabular-nums text-gray-500">
+                              {d != null ? formatDuration(d) : "—"}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </CardContent>
+                </Card>
+              ) : null}
 
               <div className={`flex items-start gap-3 rounded-xl border p-4 ${result.policyStatus.status === "approved" ? "border-green-200 bg-green-50" : "border-amber-200 bg-amber-50"}`}>
                 {result.policyStatus.status === "approved" ? <ShieldCheck className="size-5 text-green-600" /> : <AlertTriangle className="size-5 text-amber-600" />}
