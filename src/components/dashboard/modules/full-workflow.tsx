@@ -553,7 +553,12 @@ export function FullWorkflow() {
       const message = error instanceof Error ? error.message : "The full workflow failed.";
       failWorkflowRun(runId, message);
       setActiveTab("input");
-      toast.error(message);
+      // Keep the failure visible until the user dismisses it — a 4s auto-hide
+      // flashed by before they could read what actually went wrong.
+      toast.error("The workflow could not finish", {
+        description: message,
+        duration: Infinity,
+      });
     } finally {
       setIsRunning(false);
     }
