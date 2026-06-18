@@ -33,10 +33,12 @@ import {
   AlertTriangle,
   ArrowLeft,
   ArrowRight,
+  Check,
   CheckCircle2,
   ChevronDown,
   Circle,
   Clock3,
+  Copy,
   Eye,
   Download,
   FileJson,
@@ -238,6 +240,7 @@ export function FullWorkflow() {
   // Persistent in-UI copy of the last failure, so the message stays readable even
   // if the toast auto-hides or is missed. Cleared when a new run starts.
   const [runError, setRunError] = useState<string | null>(null);
+  const [copiedError, setCopiedError] = useState(false);
   // Run timing: wall-clock elapsed (ticks live while running, then freezes).
   const [runStartedAt, setRunStartedAt] = useState<number | null>(null);
   const [runEndedAt, setRunEndedAt] = useState<number | null>(null);
@@ -616,6 +619,24 @@ export function FullWorkflow() {
     }
   };
 
+  const copyRunError = async () => {
+    if (!runError) return;
+    try {
+      await navigator.clipboard.writeText(runError);
+      setCopiedError(true);
+      window.setTimeout(() => setCopiedError(false), 2000);
+    } catch {
+      toast.error("Could not copy automatically — select the text and copy it manually.");
+    }
+  };
+
+  // When every provider failed for quota/billing reasons, the raw chain is noisy;
+  // add one plain-language line telling the user what to actually do about it.
+  const runErrorHint =
+    runError && /rate limit|quota|credit balance|billing|free-models-per-day|too low|insufficient/i.test(runError)
+      ? "All AI providers are out of quota or credits right now. Add credits to OpenRouter (a $10 top-up unlocks 1,000 free requests/day), or to Anthropic/Gemini — or try again later, once the free daily quotas reset."
+      : null;
+
   const exportBaseName = useMemo(
     () => (input.productName || project?.name || "sellercrew-delivery").trim().toLowerCase().replace(/[^a-z0-9]+/g, "-"),
     [input.productName, project?.name]
@@ -647,20 +668,41 @@ export function FullWorkflow() {
       </div>
 
       {runError ? (
-        <div className="flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">
-          <AlertTriangle className="mt-0.5 size-5 shrink-0 text-red-600" />
-          <div className="min-w-0 flex-1">
-            <p className="font-semibold">The workflow could not finish</p>
-            <p className="mt-1 whitespace-pre-wrap break-words leading-6 text-red-700">{runError}</p>
+        <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">
+          <div className="flex items-start gap-3">
+            <AlertTriangle className="mt-0.5 size-5 shrink-0 text-red-600" />
+            <div className="min-w-0 flex-1">
+              <p className="font-semibold">The workflow could not finish</p>
+              {runErrorHint ? <p className="mt-1 leading-6 text-red-700">{runErrorHint}</p> : null}
+              {/* One click selects the whole message; the Copy button copies it. */}
+              <p
+                onClick={copyRunError}
+                title="Click to copy"
+                className="mt-2 max-h-44 cursor-pointer overflow-auto whitespace-pre-wrap break-words rounded-lg border border-red-100 bg-white/70 p-3 font-mono text-xs leading-5 text-red-700"
+              >
+                {runError}
+              </p>
+            </div>
+            <div className="flex shrink-0 items-center gap-1">
+              <button
+                type="button"
+                onClick={copyRunError}
+                className="flex items-center gap-1 rounded-md border border-red-200 bg-white px-2 py-1 text-xs font-semibold text-red-600 transition hover:bg-red-100"
+                aria-label="Copy error"
+              >
+                {copiedError ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
+                {copiedError ? "Copied" : "Copy"}
+              </button>
+              <button
+                type="button"
+                onClick={() => setRunError(null)}
+                className="rounded-md p-1 text-red-400 transition hover:bg-red-100 hover:text-red-600"
+                aria-label="Dismiss error"
+              >
+                <X className="size-4" />
+              </button>
+            </div>
           </div>
-          <button
-            type="button"
-            onClick={() => setRunError(null)}
-            className="shrink-0 rounded-md p-1 text-red-400 transition hover:bg-red-100 hover:text-red-600"
-            aria-label="Dismiss error"
-          >
-            <X className="size-4" />
-          </button>
         </div>
       ) : null}
 
