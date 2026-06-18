@@ -10,6 +10,7 @@ import { refundByCreditId } from "@/lib/server-credits";
 // long-lived process (a separate service in production).
 
 const STALE_JOB_MS = 15 * 60 * 1000; // a real run is <~6min; older "running" = dead
+const REAP_INTERVAL_MS = 5 * 60 * 1000; // re-check for stranded jobs periodically
 
 /**
  * Recover jobs whose process died mid-run: anything stuck in queued/running and
@@ -58,7 +59,15 @@ async function reapStrandedJobs() {
 async function main() {
   const connection = await getRedisConnectionOptions();
 
+  // Reap once on startup, then periodically: a job killed mid-run (worker
+  // restart, BullMQ stall with maxStalledCount:0, crash) otherwise stays
+  // "running" in our DB — and its reserved credits stay unrefunded — until the
+  // NEXT restart. The startup-only reaper missed jobs that died less than
+  // STALE_JOB_MS before boot. A periodic sweep cleans + refunds them on its own.
   await reapStrandedJobs();
+  setInterval(() => {
+    reapStrandedJobs().catch((error) => console.error("[worker] periodic reaper failed:", error));
+  }, REAP_INTERVAL_MS);
 
   const worker = new Worker(
     WORKFLOW_QUEUE,
