@@ -705,8 +705,10 @@ export async function runWorkflow(input: ProductInput, { userId: uid, emit, onCh
           keywords: input.keywords,
         }).catch(() => "");
 
-        await agent({ stepId: "noor", input, reports, emit, images: references });
+        // Wave 1: vision + research run together — all depend only on Ali's
+        // evidence/context, not on each other.
         await Promise.all([
+          agent({ stepId: "noor", input, reports, emit, images: references }),
           agent({ stepId: "raed", input, reports, emit }),
           agent({ stepId: "fares", input, reports, emit }),
         ]);
@@ -720,11 +722,14 @@ export async function runWorkflow(input: ProductInput, { userId: uid, emit, onCh
           agent({ stepId: "adam", input, reports, emit }),
         ]);
 
-        if (settings?.features.imageGeneration !== false && adam && "output" in adam) {
+        // Image generation only needs Adam's prompts; the final audits (Badr,
+        // Saleem) review the image PLAN and prompts, not the rendered bytes — so
+        // rendering can run concurrently with them instead of blocking them.
+        const generateImages = async () => {
+          if (settings?.features.imageGeneration === false || !adam || !("output" in adam)) return;
           const prompts = imagePrompts(adam);
-          // Generate images concurrently (bounded) instead of one-at-a-time — this
-          // was the single biggest serial stretch on the critical path. A small pool
-          // keeps us from hammering the image provider all at once.
+          // Generate images concurrently (bounded) instead of one-at-a-time. A
+          // small pool keeps us from hammering the image provider all at once.
           const IMAGE_CONCURRENCY = 3;
           const imageWarnings: string[] = [];
           let nextIndex = 0;
@@ -780,10 +785,15 @@ export async function runWorkflow(input: ProductInput, { userId: uid, emit, onCh
             }
           }
           emit({ type: "step", stepId: "adam", status: "completed" });
-        }
+        };
 
-        await agent({ stepId: "badr", input, reports, emit });
-        await agent({ stepId: "saleem-final", input, reports, emit, policyContext });
+        // Wave: render images while the two independent audits run.
+        await Promise.all([
+          generateImages(),
+          agent({ stepId: "badr", input, reports, emit }),
+          agent({ stepId: "saleem-final", input, reports, emit, policyContext }),
+        ]);
+
         const final = await agent({ stepId: "ali-final", input, reports, emit, final: true });
         if (!final || !("result" in final)) throw new Error("Ali did not return a final delivery.");
 
