@@ -12,6 +12,7 @@ import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { AdminSecrets } from '@/components/dashboard/modules/admin-secrets';
+import { workflowSteps } from '@/lib/workflow';
 
 type ProviderId = 'anthropic' | 'gemini' | 'openrouter';
 
@@ -24,6 +25,7 @@ interface Settings {
     geminiImage: string;
     openrouterTextFallbacks: string[];
     openrouterImageFallbacks: string[];
+    byAgent: Record<string, Partial<Record<ProviderId, string>>>;
   };
   providerOrder: ProviderId[];
   features: { openRouterFallback: boolean; imageGeneration: boolean };
@@ -217,6 +219,19 @@ export function AdminSettings() {
         [key]: value.split('\n').map((model) => model.trim()).filter(Boolean),
       },
     });
+  // Per-agent Anthropic model override. Empty clears it (agent uses the default).
+  const setAgentModel = (stepId: string, value: string) => {
+    const byAgent = { ...(settings.models.byAgent ?? {}) };
+    const trimmed = value.trim();
+    if (trimmed) byAgent[stepId] = { ...byAgent[stepId], anthropic: trimmed };
+    else {
+      const rest = { ...byAgent[stepId] };
+      delete rest.anthropic;
+      if (Object.keys(rest).length) byAgent[stepId] = rest;
+      else delete byAgent[stepId];
+    }
+    setSettings({ ...settings, models: { ...settings.models, byAgent } });
+  };
 
   return (
     <div className="space-y-6">
@@ -311,6 +326,33 @@ export function AdminSettings() {
               Used exclusively to generate product images. They are never routed to copywriting, analysis, or compliance tasks.
             </p>
           </div>
+        </div>
+      </Card>
+
+      <Card className="p-5">
+        <div className="mb-1 flex items-center gap-2">
+          <h3 className="text-sm font-semibold text-slate-800">Per-agent model tiering</h3>
+          <Badge variant="outline" className="border-violet-200 text-violet-600">Anthropic</Badge>
+        </div>
+        <p className="mb-3 text-xs leading-5 text-slate-500">
+          Override the Anthropic model for individual agents. Leave blank to use the default
+          (<span className="font-mono">{settings.models.anthropic}</span>). Spend on a stronger model
+          (e.g. <span className="font-mono">claude-sonnet-4-6</span>) only where quality matters most.
+        </p>
+        <div className="grid gap-2 sm:grid-cols-2">
+          {workflowSteps.map((step) => (
+            <div key={step.id} className="flex items-center gap-2">
+              <Label className="w-28 shrink-0 truncate text-xs text-slate-500" title={step.label}>
+                {step.label}
+              </Label>
+              <Input
+                value={settings.models.byAgent?.[step.id]?.anthropic ?? ''}
+                placeholder={settings.models.anthropic}
+                onChange={(e) => setAgentModel(step.id, e.target.value)}
+                className="h-8 font-mono text-xs"
+              />
+            </div>
+          ))}
         </div>
       </Card>
       </SettingsGroup>

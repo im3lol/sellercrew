@@ -123,9 +123,18 @@ async function generateWithAnthropic(options: GenerateAITextOptions, modelOverri
     },
     body: JSON.stringify({
       model,
-      system: options.json
-        ? `${options.system}\nReturn only valid JSON with no markdown fences.`
-        : options.system,
+      // Send the system prompt as a cached block: an agent's instructions are
+      // stable across its retry and across runs, so repeated calls bill the
+      // system prefix at cache-read (~0.1x) rates instead of full price.
+      system: [
+        {
+          type: "text",
+          text: options.json
+            ? `${options.system}\nReturn only valid JSON with no markdown fences.`
+            : options.system,
+          cache_control: { type: "ephemeral" },
+        },
+      ],
       messages,
       max_tokens: options.maxTokens ?? 2_000,
       stream: Boolean(options.onTextDelta),
