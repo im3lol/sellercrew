@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { z } from "zod";
-import { generateAIText, parseAIJson, type AIImageInput } from "@/lib/ai/providers";
+import { generateAIText, parseAIJson, isTruncatedJson, type AIImageInput } from "@/lib/ai/providers";
 import { generateProductImage } from "@/lib/ai/image-generation";
 import { guard } from "@/lib/api-guard";
 import { getBlockedTerms } from "@/lib/compliance";
@@ -211,13 +211,14 @@ RULES:
 4. Add a strong negative prompt preventing hallucinated accessories, altered branding, malformed geometry, extra controls, unreadable text, watermark, Amazon logo, badges, and misleading claims.
 5. Do not output generic prompts or omit a Rayan concept.
 OUTPUT: imagePrompts with imageNumber, purpose, prompt, negativePrompt, sourceConceptCheck.`,
-    badr: `You are Badr, independent quality and evidence auditor.
-MISSION: audit the complete listing and creative package before final policy review.
-RULES:
-1. Trace every product fact and visual claim to seller input, uploaded image evidence, or an approved upstream report.
-2. Check copy consistency, completeness, readability, SEO quality, duplication, image-plan alignment, and hallucination risk.
-3. Record concrete issues with the responsible agent and exact correction.
-4. Do not silently rewrite outputs or approve unsupported content.
+    badr: `You are Badr, the independent quality and evidence auditor. Be adversarial: your job is to find what is wrong, not to praise.
+MISSION: audit the complete listing and creative package before final policy review, and catch every unsupported or fabricated claim.
+METHOD:
+1. Take each concrete claim in the title, bullets, description, A+ content, backend terms, and image plan ONE AT A TIME, and trace it to a specific source: confirmed seller input, the evidence lock, a clearly visible detail in Noor's image report, or an approved upstream report. Quote the supporting source.
+2. Any claim you cannot trace to a source is an evidence failure — record it in evidenceFailures with the exact phrase and the responsible agent. Do not give it the benefit of the doubt; when support is unclear, treat it as unsupported.
+3. Specifically hunt for: invented measurements/materials/capacities, unproven performance or health/safety claims, fabricated certifications or compatibility, superlatives and rankings ("best", "#1"), unverifiable comparisons, and any feature not present in the evidence.
+4. Also check consistency, completeness, readability, SEO quality, duplication, and image-plan/prompt alignment with the verified product.
+5. Set hallucinationRisk (0-100) from the share and severity of unsupported claims. If there is ANY unsupported factual claim, banned/risky term, or fabricated spec, set requiresRevision=true and name the revisionTargetAgent. Never approve unsupported content; never rewrite it yourself.
 OUTPUT: scores, strengths, issues, recommendations, evidenceFailures, hallucinationRisk, requiresRevision, revisionTargetAgent.`,
     "saleem-final": `You are Saleem performing the final Amazon policy and claims audit with full Policy Knowledge Base access.
 MISSION: review final copy, backend terms, image plan, overlays, and Adam prompts.
@@ -294,23 +295,35 @@ ${JSON.stringify(z.toJSONSchema(schema))}`;
   );
 
   const parseResponse = () => schema.parse(parseAIJson(response.text));
-  let structured: z.infer<typeof agentWorkSchema> | z.infer<typeof finalResultSchema>;
-  try {
-    structured = parseResponse();
-  } catch {
+  // Give the regeneration more room — a cut-off response usually means it ran out
+  // of tokens, so retrying at the same budget just truncates again.
+  const retryTokens = Math.min(Math.ceil(maxTokens * 1.5), options.final ? 12_000 : 6_000);
+  let structured: z.infer<typeof agentWorkSchema> | z.infer<typeof finalResultSchema> | undefined;
+
+  // Accept the first response only if it's complete (not cut off) AND parses.
+  // Silently bracket-repaired, truncated JSON is treated as a failure to retry.
+  if (!isTruncatedJson(response.text)) {
+    try {
+      structured = parseResponse();
+    } catch {
+      // fall through to regeneration
+    }
+  }
+
+  if (!structured) {
     options.emit({
       type: "step",
       stepId: step.id,
       status: "working",
-      message: `${step.label} is correcting its structured response.`,
+      message: `${step.label} is regenerating a complete structured response.`,
     });
     response = await withProviderRetry(
       () => generateAIText({
-        system: `${systemPrompt}\nYour previous response was invalid JSON. Regenerate it from scratch. Check every property name, quote, comma, bracket, and brace before responding.`,
+        system: `${systemPrompt}\nYour previous response was incomplete or invalid JSON (it may have been cut off mid-output). Return the COMPLETE JSON object from scratch, concise enough to finish within the limit. Check every property name, quote, comma, bracket, and brace before responding.`,
         prompt: requestPrompt,
         images: options.images,
         json: true,
-        maxTokens,
+        maxTokens: retryTokens,
         modelOverrides: options.modelOverrides,
       }),
       (delayMs) => options.emit({
