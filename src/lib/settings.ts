@@ -17,6 +17,22 @@ export const DEFAULT_OPENROUTER_IMAGE_MODELS = [
   "openai/gpt-5.4-image-2",
 ] as const;
 
+// Per-agent model tiering. Light agents (intake, gates, keywords, SEO, review)
+// run on the provider's cheap/fast default model; the agents whose quality moves
+// the needle most — strategy, the copywriter, and the final assembler — are bumped
+// to a stronger model. Keyed by stepId -> provider -> model id. Only the entry for
+// the provider that actually runs is used; an unset provider falls back to that
+// provider's default model. Defaults target Anthropic (the recommended provider);
+// admins can extend per provider in Settings & API.
+export const DEFAULT_AGENT_MODEL_TIERS: Record<
+  string,
+  Partial<Record<"anthropic" | "gemini" | "openrouter", string>>
+> = {
+  hakim: { anthropic: "claude-sonnet-4-6" },
+  bayan: { anthropic: "claude-sonnet-4-6" },
+  "ali-final": { anthropic: "claude-sonnet-4-6" },
+};
+
 export interface AppSettings {
   models: {
     anthropic: string;
@@ -26,6 +42,7 @@ export interface AppSettings {
     geminiImage: string;
     openrouterTextFallbacks: string[];
     openrouterImageFallbacks: string[];
+    byAgent: Record<string, Partial<Record<"anthropic" | "gemini" | "openrouter", string>>>;
   };
   providerOrder: Array<"anthropic" | "gemini" | "openrouter">;
   features: {
@@ -50,15 +67,20 @@ const CACHE_TTL_MS = 30_000;
 function defaults(): AppSettings {
   return {
     models: {
-      anthropic: process.env.ANTHROPIC_MODEL || "claude-sonnet-4-6",
+      // Haiku 4.5 is the fast/cheap workhorse for most agents (strong JSON +
+      // vision for Noor); critical agents are bumped to Sonnet via byAgent below.
+      anthropic: process.env.ANTHROPIC_MODEL || "claude-haiku-4-5",
       gemini: process.env.GEMINI_MODEL || "gemini-2.5-flash",
       openrouter: process.env.OPENROUTER_WORKFLOW_MODEL || DEFAULT_OPENROUTER_TEXT_MODELS[0],
       openai: process.env.OPENAI_WORKFLOW_MODEL || "gpt-5.4-mini",
       geminiImage: process.env.OPENROUTER_IMAGE_MODEL || DEFAULT_OPENROUTER_IMAGE_MODELS[0],
       openrouterTextFallbacks: DEFAULT_OPENROUTER_TEXT_MODELS.slice(1),
       openrouterImageFallbacks: DEFAULT_OPENROUTER_IMAGE_MODELS.slice(1),
+      byAgent: DEFAULT_AGENT_MODEL_TIERS,
     },
-    providerOrder: ["openrouter", "anthropic", "gemini"],
+    // Anthropic first: reliable paid models (Haiku/Sonnet) lead, with the free
+    // OpenRouter chain and Gemini as fallbacks if Anthropic is unavailable.
+    providerOrder: ["anthropic", "openrouter", "gemini"],
     features: {
       openRouterFallback: true,
       imageGeneration: true,
