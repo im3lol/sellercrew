@@ -10,6 +10,7 @@ const base: AppSettings = {
     geminiImage: "google/gemini-2.5-flash-image",
     openrouterTextFallbacks: ["a", "b"],
     openrouterImageFallbacks: ["x", "y"],
+    byAgent: { bayan: { anthropic: "claude-sonnet-4-6" } },
   },
   providerOrder: ["openrouter", "anthropic", "gemini"],
   features: { openRouterFallback: true, imageGeneration: true },
@@ -46,5 +47,13 @@ describe("mergeSettings", () => {
   it("does not mutate the base object", () => {
     mergeSettings(base, { models: { gemini: "changed" } });
     expect(base.models.gemini).toBe("gemini-2.5-flash");
+  });
+
+  it("replaces the per-agent model tiers when provided", () => {
+    const merged = mergeSettings(base, {
+      models: { byAgent: { hakim: { anthropic: "claude-opus-4-8" } } },
+    });
+    expect(merged.models.byAgent).toEqual({ hakim: { anthropic: "claude-opus-4-8" } });
+    expect(merged.models.anthropic).toBe("claude-sonnet-4-6");
   });
 });

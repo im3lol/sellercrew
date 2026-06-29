@@ -23,6 +23,9 @@ interface GenerateAITextOptions {
   json?: boolean;
   maxTokens?: number;
   onTextDelta?: (delta: string, fullText: string) => void;
+  // Per-agent model tiering: override the model for the provider that runs.
+  // Each entry wins over the admin-configured default for that provider.
+  modelOverrides?: Partial<Record<"anthropic" | "gemini" | "openrouter", string>>;
 }
 
 export interface AITokenUsage {
@@ -424,11 +427,12 @@ export async function generateAIText(options: GenerateAITextOptions): Promise<AI
   const order = settings?.providerOrder ?? ["anthropic", "gemini", "openrouter"];
   const fallback = settings?.features.openRouterFallback ?? true;
 
+  const overrides = options.modelOverrides;
   const runners: Record<string, () => Promise<AITextResult>> = {
-    anthropic: () => generateWithAnthropic(options, models?.anthropic),
-    gemini: () => generateWithGemini(options, models?.gemini),
+    anthropic: () => generateWithAnthropic(options, overrides?.anthropic || models?.anthropic),
+    gemini: () => generateWithGemini(options, overrides?.gemini || models?.gemini),
     openrouter: () => generateWithOpenRouterTextModels(options, [
-      models?.openrouter,
+      overrides?.openrouter || models?.openrouter,
       ...(models?.openrouterTextFallbacks ?? DEFAULT_OPENROUTER_TEXT_MODELS.slice(1)),
     ]),
   };

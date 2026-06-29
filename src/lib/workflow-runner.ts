@@ -247,6 +247,7 @@ async function runAgent(options: {
   final?: boolean;
   policyContext?: string;
   tokenTotals?: { input: number; output: number };
+  modelOverrides?: Partial<Record<"anthropic" | "gemini" | "openrouter", string>>;
 }) {
   const step = workflowSteps.find((item) => item.id === options.stepId);
   if (!step) throw new Error(`Unknown workflow step: ${options.stepId}`);
@@ -280,6 +281,7 @@ ${JSON.stringify(z.toJSONSchema(schema))}`;
       images: options.images,
       json: true,
       maxTokens,
+      modelOverrides: options.modelOverrides,
     }),
     (delayMs) => options.emit({
       type: "step",
@@ -307,6 +309,7 @@ ${JSON.stringify(z.toJSONSchema(schema))}`;
         images: options.images,
         json: true,
         maxTokens,
+        modelOverrides: options.modelOverrides,
       }),
       (delayMs) => options.emit({
         type: "step",
@@ -582,7 +585,11 @@ export async function runWorkflow(input: ProductInput, { userId: uid, emit, onCh
       const references = input.uploadedImages.map((image) => ({ dataUrl: image.dataUrl, type: image.type }));
       const startedAt = Date.now();
       const tokenTotals = { input: 0, output: 0 };
-      const agent = (opts: Parameters<typeof runAgent>[0]) => runAgent({ ...opts, tokenTotals });
+      // Per-agent model tiering, filled once settings load below. Captured by the
+      // wrapper so each agent runs on its configured model (e.g. Sonnet for copy).
+      let agentModelTiers: Record<string, Partial<Record<"anthropic" | "gemini" | "openrouter", string>>> = {};
+      const agent = (opts: Parameters<typeof runAgent>[0]) =>
+        runAgent({ ...opts, tokenTotals, modelOverrides: agentModelTiers[opts.stepId] });
 
       const recordRun = async (data: {
         provider?: string;
@@ -618,6 +625,7 @@ export async function runWorkflow(input: ProductInput, { userId: uid, emit, onCh
       };
 
       const settings = await getSettings().catch(() => null);
+      agentModelTiers = settings?.models.byAgent ?? {};
       let creditCharge: CreditCharge = { charged: false, creditId: null };
 
       try {
