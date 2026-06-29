@@ -492,6 +492,38 @@ function extractJsonCandidate(input: string): string {
   return input.slice(Math.min(...starts));
 }
 
+/**
+ * True when the model's JSON looks cut off (unbalanced brackets or an unterminated
+ * string) — the signature of hitting the max-token limit mid-output. Lets callers
+ * retry with a larger budget instead of silently accepting bracket-repaired,
+ * incomplete output. Returns false when there is no JSON at all (a different
+ * failure handled by the parser).
+ */
+export function isTruncatedJson(text: string): boolean {
+  const candidate = extractJsonCandidate(
+    text.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "").trim()
+  );
+  if (!candidate || (candidate[0] !== "{" && candidate[0] !== "[")) return false;
+
+  const stack: string[] = [];
+  let inString = false;
+  let escaped = false;
+  for (let i = 0; i < candidate.length; i += 1) {
+    const char = candidate[i];
+    if (inString) {
+      if (escaped) escaped = false;
+      else if (char === "\\") escaped = true;
+      else if (char === '"') inString = false;
+      continue;
+    }
+    if (char === '"') inString = true;
+    else if (char === "{") stack.push("}");
+    else if (char === "[") stack.push("]");
+    else if (char === "}" || char === "]") stack.pop();
+  }
+  return inString || stack.length > 0;
+}
+
 function removeTrailingCommas(input: string): string {
   let output = "";
   let inString = false;
