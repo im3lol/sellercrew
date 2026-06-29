@@ -241,6 +241,31 @@ model WorkflowRun {
   @@index([status])
 }
 
+// ============================================
+// AI MEMORY & RAG (the crew's long-term memory)
+// Per-user store of distilled knowledge from past runs — verified facts, brand
+// context, glossary — captured after each successful workflow and retrieved (by
+// lexical relevance to the current product) to ground future runs.
+// ============================================
+
+model AiMemory {
+  id          String   @id @default(cuid())
+  userId      String   @map("user_id")
+  kind        String   // brand | verified_fact | glossary | preference
+  title       String
+  content     String
+  keywords    String   @default("[]") // JSON array of strings, for lexical retrieval
+  source      String?  // e.g. the product name the memory came from
+  fingerprint String   // normalized hash for exact-duplicate detection
+  useCount    Int      @default(0) @map("use_count")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([userId, fingerprint])
+  @@index([userId])
+  @@index([kind])
+}
+
 // Background workflow job processed by the BullMQ worker. The full input
 // (incl. images) and streamed progress/result live here; Redis only carries id.
 model WorkflowJob {
