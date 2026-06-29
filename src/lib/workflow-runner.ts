@@ -5,6 +5,7 @@ import { generateProductImage } from "@/lib/ai/image-generation";
 import { guard } from "@/lib/api-guard";
 import { getBlockedTerms } from "@/lib/compliance";
 import { getPolicyContextForSaleem } from "@/lib/policies";
+import { getMemoryContextForCrew, recordWorkflowMemories } from "@/lib/ai-memory";
 import { getSettings } from "@/lib/settings";
 import { db } from "@/lib/db";
 import { FULL_WORKFLOW_COST } from "@/lib/credits";
@@ -246,6 +247,7 @@ async function runAgent(options: {
   images?: AIImageInput[];
   final?: boolean;
   policyContext?: string;
+  memoryContext?: string;
   tokenTotals?: { input: number; output: number };
   modelOverrides?: Partial<Record<"anthropic" | "gemini" | "openrouter", string>>;
 }) {
@@ -255,7 +257,7 @@ async function runAgent(options: {
   const startedAt = new Date().toISOString();
   const schema = options.final ? finalResultSchema : agentWorkSchema;
   const previousReports = reportContext(options.reports);
-  const systemPrompt = `${agentInstructions(step.id)}${options.policyContext ? `\n\n${options.policyContext}` : ""}
+  const systemPrompt = `${agentInstructions(step.id)}${options.policyContext ? `\n\n${options.policyContext}` : ""}${options.memoryContext ? `\n\n${options.memoryContext}` : ""}
 
 You are one independent specialist in a multi-agent workflow.
 NON-NEGOTIABLE EXECUTION RULES:
@@ -588,8 +590,11 @@ export async function runWorkflow(input: ProductInput, { userId: uid, emit, onCh
       // Per-agent model tiering, filled once settings load below. Captured by the
       // wrapper so each agent runs on its configured model (e.g. Sonnet for copy).
       let agentModelTiers: Record<string, Partial<Record<"anthropic" | "gemini" | "openrouter", string>>> = {};
+      // Retrieved prior-knowledge (RAG) block, filled once the gate passes; shared
+      // by every agent so the whole crew builds on the seller's past runs.
+      let memoryContext = "";
       const agent = (opts: Parameters<typeof runAgent>[0]) =>
-        runAgent({ ...opts, tokenTotals, modelOverrides: agentModelTiers[opts.stepId] });
+        runAgent({ ...opts, tokenTotals, memoryContext, modelOverrides: agentModelTiers[opts.stepId] });
 
       const recordRun = async (data: {
         provider?: string;
@@ -687,6 +692,19 @@ export async function runWorkflow(input: ProductInput, { userId: uid, emit, onCh
           return;
         }
 
+        // RAG: pull this seller's relevant prior knowledge now that the gate passed,
+        // so every content-producing agent below builds on it. Best-effort.
+        memoryContext = await getMemoryContextForCrew(uid, {
+          productName: input.productName,
+          brandName: input.brandName,
+          category: input.category,
+          description: input.description,
+          specifications: input.specifications,
+          materials: input.materials,
+          targetAudience: input.targetAudience,
+          keywords: input.keywords,
+        }).catch(() => "");
+
         await agent({ stepId: "noor", input, reports, emit, images: references });
         await Promise.all([
           agent({ stepId: "raed", input, reports, emit }),
@@ -777,6 +795,8 @@ export async function runWorkflow(input: ProductInput, { userId: uid, emit, onCh
         });
         emit({ type: "result", provider: final.provider, model: final.model, result });
         await recordRun({ provider: final.provider, model: final.model, result, blocked: false });
+        // Capture durable knowledge from this run for future RAG retrieval.
+        await recordWorkflowMemories(uid, input, result);
       } catch (error) {
         // The run failed before delivering a listing — return the credits.
         await refundCredits(creditCharge, FULL_WORKFLOW_COST);
